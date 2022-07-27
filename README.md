@@ -6,5 +6,5 @@ This is a plugin for Jenkins that allows you to run [Levo](https://levo.ai) test
 
 ## LICENSE
 
-Licensed under MIT, see [LICENSE](LICENSE.md)
+Licensed under Apache 2.0, see [LICENSE](LICENSE.md)
 
