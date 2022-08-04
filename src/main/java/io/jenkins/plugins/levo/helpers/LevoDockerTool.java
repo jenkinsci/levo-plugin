@@ -26,9 +26,8 @@ import hudson.util.ArgumentListBuilder;
 import hudson.util.Secret;
 import org.jenkinsci.plugins.docker.commons.tools.DockerTool;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -36,14 +35,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
-    public static int CLIENT_TIMEOUT = 1800;
+    public static final int CLIENT_TIMEOUT = 1800;
+    public static final String ENV_FILE_NAME = "environment.yaml";
+    public static final String LEVO_CONFIG_FOLDER_NAME = ".levoconfig";
 
     private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir) throws IOException, InterruptedException {
-        Node currentNode = run.getExecutor().getOwner().getNode();
+        Node currentNode;
+        if (run.getExecutor() != null) {
+            currentNode = run.getExecutor().getOwner().getNode();
+        } else {
+            throw new IllegalStateException("Run has no executor");
+        }
         ArgumentListBuilder argb = new ArgumentListBuilder();
         argb.add(DockerTool.getExecutable(null, currentNode, launcher.getListener(), launchEnv), "run");
 
-        Path levoConfigPath = Paths.get(workdir, ".levoconfig");
+        Path levoConfigPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
         if (!Files.exists(levoConfigPath)) {
             Files.createDirectory(levoConfigPath);
         }
@@ -89,13 +95,13 @@ public class LevoDockerTool {
         argb.add("test", "--target-url", target, "--test-plan", testPlan);
 
         if (environment != null) {
-            Path envPath = Paths.get(workdir, "environment.yaml");
+            Path envPath = Paths.get(workdir, ENV_FILE_NAME);
             if (Files.exists(envPath)) {
                 Files.delete(envPath);
             }
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(envPath.toString(), false))) {
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(envPath.toString()), StandardCharsets.UTF_8))) {
                 writer.append(environment);
-                argb.add("--env-file", "environment.yaml");
+                argb.add("--env-file", ENV_FILE_NAME);
             }
         }
         launcher.getListener().getLogger().println("Starting launch for: " + argb.toString());
@@ -110,11 +116,9 @@ public class LevoDockerTool {
     }
 
     private static void afterRunCleanUp(String workdir) throws IOException {
-        Path envPath = Paths.get(workdir, "environment.yaml");
-        Path configPath = Paths.get(workdir, ".levoconfig");
-        Path hostEnvsPath = Paths.get(workdir, "host.env");
+        Path envPath = Paths.get(workdir, ENV_FILE_NAME);
+        Path configPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
         Files.delete(envPath);
         Files.delete(configPath);
-        Files.delete(hostEnvsPath);
     }
 }

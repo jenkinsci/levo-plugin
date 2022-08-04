@@ -42,6 +42,7 @@ import org.kohsuke.stapler.QueryParameter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 
 public class TestPlanBuilder extends Builder implements SimpleBuildStep {
@@ -110,14 +111,15 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                     listener.error("Defined Secret Environment not found");
                     return;
                 } else {
-                    environment = new BufferedReader(new InputStreamReader(secretFileCredentials.getContent()))
-                            .lines().collect(Collectors.joining("\n"));
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(secretFileCredentials.getContent(), StandardCharsets.UTF_8))){
+                        environment = reader.lines().collect(Collectors.joining("\n"));
+                    }
                 }
             } else {
                 environment = secretCredentials.getSecret().getPlainText();
             }
         }
-        LevoDockerTool.runLevoLogin(run, launcher, env, getPath(launcher, workspace),credentials.getCLIAuthorizationKey(), credentials.getOrganizationId());
+        LevoDockerTool.runLevoLogin(run, launcher, env, getPath(launcher, workspace),credentials.getAuthorizationKey(), credentials.getOrganizationId());
         LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environment);
     }
 
