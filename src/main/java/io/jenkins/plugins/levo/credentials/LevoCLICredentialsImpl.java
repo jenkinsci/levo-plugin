@@ -28,10 +28,10 @@ public class LevoCLICredentialsImpl extends BaseStandardCredentials implements L
     private final Secret authorizationKey;
 
     @DataBoundConstructor
-    public LevoCLICredentialsImpl(CredentialsScope scope, String id, String description, String organizationId, String authorizationKey) {
+    public LevoCLICredentialsImpl(CredentialsScope scope, String id, String description, String organizationId, Secret authorizationKey) {
         super(scope, id, description);
         this.organizationId = organizationId;
-        this.authorizationKey = Secret.fromString(authorizationKey);
+        this.authorizationKey = authorizationKey;
     }
 
     @Override
@@ -40,7 +40,7 @@ public class LevoCLICredentialsImpl extends BaseStandardCredentials implements L
     }
 
     @Override
-    public Secret getCLIAuthorizationKey() {
+    public Secret getAuthorizationKey() {
         return this.authorizationKey;
     }
 

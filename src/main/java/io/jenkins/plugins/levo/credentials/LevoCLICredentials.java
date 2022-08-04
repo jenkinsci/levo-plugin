@@ -28,5 +28,5 @@ import java.io.IOException;
 )
 public interface LevoCLICredentials extends StandardCredentials {
     String getOrganizationId();
-    Secret getCLIAuthorizationKey() throws IOException, InterruptedException;
+    Secret getAuthorizationKey() throws IOException, InterruptedException;
 }
