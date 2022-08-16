@@ -12,7 +12,7 @@
     <version>${changelist}</version>
     <packaging>hpi</packaging>
     <name>Levo Plugin</name>
-    <url>https://github.com/jenkinsci/levo-plugin/tree/${project.artifactId}-${revision}</url>
+    <url>https://github.com/jenkinsci/levo-plugin</url>
     <licenses>
         <license>
             <name>MIT License</name>
