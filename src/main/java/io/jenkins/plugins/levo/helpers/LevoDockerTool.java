@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
@@ -55,6 +54,18 @@ public class LevoDockerTool {
         }
         argb.add("-v", levoConfigPath + ":/home/levo/.config/configstore:rw");
         argb.add("-v", workdir + ":/home/levo/work:rw");
+
+        // If Jenkins agent is running on Linux, set the current user and group ids because Docker volume mounts
+        // on Linux need these special settings.
+        if (currentNode != null && currentNode.toComputer() != null &&
+                currentNode.toComputer().getSystemProperties() != null)
+        {
+            Object osName = currentNode.toComputer().getSystemProperties().get("os.name");
+            if (osName instanceof String && ((String) osName).toLowerCase().contains("linux")) {
+                argb.add("-e", "LOCAL_USER_ID=$(id -u)");
+                argb.add("-e", "LOCAL_GROUP_ID=$(id -g)");
+            }
+        }
 
         argb.add("-e", "TERM=xterm-256color");
 
