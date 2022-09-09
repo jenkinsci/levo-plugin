@@ -37,6 +37,9 @@
         <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
             <c:select/>
         </f:entry>
+        <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
+            <f:checkbox />
+        </f:entry>
     </f:advanced>
 </j:jelly>
 
