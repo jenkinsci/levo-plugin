@@ -20,6 +20,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import hudson.EnvVars;
 import hudson.Launcher;
+import hudson.model.Computer;
+import hudson.model.Executor;
 import hudson.model.Node;
 import hudson.model.Run;
 import hudson.util.ArgumentListBuilder;
@@ -31,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
@@ -39,10 +43,12 @@ public class LevoDockerTool {
     public static final String LEVO_CONFIG_FOLDER_NAME = ".levoconfig";
 
     private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir) throws IOException, InterruptedException {
-        Node currentNode;
-        if (run.getExecutor() != null) {
-            currentNode = run.getExecutor().getOwner().getNode();
-        } else {
+        Node currentNode = Optional.of(run)
+                .map(Run::getExecutor)
+                .map(Executor::getOwner)
+                .map(Node.class::cast)
+                .orElse(null);
+        if (currentNode == null) {
             throw new IllegalStateException("Run has no executor");
         }
         ArgumentListBuilder argb = new ArgumentListBuilder();
@@ -57,10 +63,14 @@ public class LevoDockerTool {
 
         // If Jenkins agent is running on Linux, set the current user and group ids because Docker volume mounts
         // on Linux need these special settings.
-        if (currentNode != null && currentNode.toComputer() != null &&
-                currentNode.toComputer().getSystemProperties() != null)
+        Computer computer = Optional.of(currentNode).map(Node::toComputer).orElse(null);
+        Map<Object, Object> systemProperties = null;
+        if (computer != null) {
+            systemProperties = computer.getSystemProperties();
+        }
+        if (systemProperties != null)
         {
-            Object osName = currentNode.toComputer().getSystemProperties().get("os.name");
+            Object osName = systemProperties.get("os.name");
             if (osName instanceof String && ((String) osName).toLowerCase().contains("linux")) {
                 argb.add("-e", "LOCAL_USER_ID=$(id -u)");
                 argb.add("-e", "LOCAL_GROUP_ID=$(id -g)");
