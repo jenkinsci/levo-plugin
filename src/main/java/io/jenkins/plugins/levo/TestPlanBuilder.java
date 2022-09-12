@@ -51,14 +51,16 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     private final String testPlan;
     private final String levoCredentialsId;
     private String secretEnvironmentId;
-    private Boolean generateJunitReport;
+    private final Boolean generateJunitReport;
+    private final String extraCLIArgs;
 
     @DataBoundConstructor
-    public TestPlanBuilder(String target, String testPlan, String levoCredentialsId, Boolean generateJunitReport) {
+    public TestPlanBuilder(String target, String testPlan, String levoCredentialsId, Boolean generateJunitReport, String extraCLIArgs) {
         this.target = target;
         this.testPlan = testPlan;
         this.levoCredentialsId = levoCredentialsId;
         this.generateJunitReport = generateJunitReport;
+        this.extraCLIArgs = extraCLIArgs;
     }
 
     @DataBoundSetter
@@ -72,6 +74,10 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
 
     public String getTestPlan() {
         return testPlan;
+    }
+
+    public String getExtraCLIArgs() {
+        return extraCLIArgs;
     }
 
     public String getSecretEnvironmentId() {
@@ -126,7 +132,7 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             }
         }
         LevoDockerTool.runLevoLogin(run, launcher, env, getPath(launcher, workspace),credentials.getAuthorizationKey(), credentials.getOrganizationId());
-        LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environment, this.generateJunitReport);
+        LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environment, this.generateJunitReport, this.extraCLIArgs);
     }
 
     private String getPath(Launcher launcher, FilePath filePath) throws IOException, InterruptedException {

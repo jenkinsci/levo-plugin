@@ -39,36 +39,33 @@ import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
     public static final int CLIENT_TIMEOUT = 1800;
+    public static final int CMD_TIMEOUT = 60;
     public static final String ENV_FILE_NAME = "environment.yaml";
     public static final String LEVO_CONFIG_FOLDER_NAME = ".levoconfig";
     public static final String LEVO_REPORTS_FOLDER_NAME = "levo-reports";
 
-    private static String getUserId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
+
+    private static String runAndParseOutput(Launcher launcher, EnvVars envVars, ArgumentListBuilder cmd) throws IOException, InterruptedException {
         Launcher.ProcStarter procStarter = launcher.launch();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ArgumentListBuilder argb = new ArgumentListBuilder();
-        argb.add("id", "-u");
         procStarter.quiet(false)
-                .cmds(argb)
-                .envs(launchEnv)
+                .cmds(cmd)
+                .envs(envVars)
                 .stdout(baos)
                 .start()
-                .joinWithTimeout(CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+                .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
         return baos.toString(StandardCharsets.UTF_8.name()).trim();
+    }
+    private static String getUserId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
+        ArgumentListBuilder argb = new ArgumentListBuilder();
+        argb.add("id", "-u");
+        return runAndParseOutput(launcher, launchEnv, argb);
     }
 
     private static String getUserGroupId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
-        Launcher.ProcStarter procStarter = launcher.launch();
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ArgumentListBuilder argb = new ArgumentListBuilder();
         argb.add("id", "-g");
-        procStarter.quiet(false)
-                .cmds(argb)
-                .envs(launchEnv)
-                .stdout(baos)
-                .start()
-                .joinWithTimeout(CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
-        return baos.toString(StandardCharsets.UTF_8.name()).trim();
+        return runAndParseOutput(launcher, launchEnv, argb);
     }
 
     private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir) throws IOException, InterruptedException {
@@ -145,7 +142,7 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs) throws IOException, InterruptedException {
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir);
 
         argb.add("test", "--target-url", target, "--test-plan", testPlan);
@@ -161,6 +158,9 @@ public class LevoDockerTool {
                 writer.append(environment);
                 argb.add("--env-file", ENV_FILE_NAME);
             }
+        }
+        if (extraCLIArgs != null && !extraCLIArgs.isEmpty()) {
+            argb.addTokenized(extraCLIArgs);
         }
         launcher.getListener().getLogger().println("Starting launch for: " + argb.toString());
         Launcher.ProcStarter procStarter = launcher.launch();
