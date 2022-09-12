@@ -39,14 +39,40 @@ import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
     public static final int CLIENT_TIMEOUT = 1800;
+    public static final int CMD_TIMEOUT = 60;
     public static final String ENV_FILE_NAME = "environment.yaml";
     public static final String LEVO_CONFIG_FOLDER_NAME = ".levoconfig";
+    public static final String LEVO_REPORTS_FOLDER_NAME = "levo-reports";
+
+
+    private static String runAndParseOutput(Launcher launcher, EnvVars envVars, ArgumentListBuilder cmd) throws IOException, InterruptedException {
+        Launcher.ProcStarter procStarter = launcher.launch();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        procStarter.quiet(false)
+                .cmds(cmd)
+                .envs(envVars)
+                .stdout(baos)
+                .start()
+                .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+        return baos.toString(StandardCharsets.UTF_8.name()).trim();
+    }
+    private static String getUserId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
+        ArgumentListBuilder argb = new ArgumentListBuilder();
+        argb.add("id", "-u");
+        return runAndParseOutput(launcher, launchEnv, argb);
+    }
+
+    private static String getUserGroupId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
+        ArgumentListBuilder argb = new ArgumentListBuilder();
+        argb.add("id", "-g");
+        return runAndParseOutput(launcher, launchEnv, argb);
+    }
 
     private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir) throws IOException, InterruptedException {
         Node currentNode = Optional.of(run)
                 .map(Run::getExecutor)
                 .map(Executor::getOwner)
-                .map(Node.class::cast)
+                .map(Computer::getNode)
                 .orElse(null);
         if (currentNode == null) {
             throw new IllegalStateException("Run has no executor");
@@ -58,7 +84,13 @@ public class LevoDockerTool {
         if (!Files.exists(levoConfigPath)) {
             Files.createDirectory(levoConfigPath);
         }
+
+        Path levoReportsPath = Paths.get(workdir, LEVO_REPORTS_FOLDER_NAME);
+        if (!Files.exists(levoReportsPath)) {
+            Files.createDirectory(levoReportsPath);
+        }
         argb.add("-v", levoConfigPath + ":/home/levo/.config/configstore:rw");
+        argb.add("-v", levoReportsPath + ":/home/levo/reports:rw");
         argb.add("-v", workdir + ":/home/levo/work:rw");
 
         // If Jenkins agent is running on Linux, set the current user and group ids because Docker volume mounts
@@ -72,8 +104,8 @@ public class LevoDockerTool {
         {
             Object osName = systemProperties.get("os.name");
             if (osName instanceof String && ((String) osName).toLowerCase().contains("linux")) {
-                argb.add("-e", "LOCAL_USER_ID=$(id -u)");
-                argb.add("-e", "LOCAL_GROUP_ID=$(id -g)");
+                argb.add("-e", "LOCAL_USER_ID=" + getUserId(launcher, launchEnv));
+                argb.add("-e", "LOCAL_GROUP_ID=" + getUserGroupId(launcher, launchEnv));
             }
         }
 
@@ -110,11 +142,13 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs) throws IOException, InterruptedException {
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir);
 
         argb.add("test", "--target-url", target, "--test-plan", testPlan);
-
+        if (generateJUnitReports != null && generateJUnitReports) {
+            argb.add("--export-junit-xml=/home/levo/reports/junit.xml");
+        }
         if (environment != null) {
             Path envPath = Paths.get(workdir, ENV_FILE_NAME);
             if (Files.exists(envPath)) {
@@ -124,6 +158,9 @@ public class LevoDockerTool {
                 writer.append(environment);
                 argb.add("--env-file", ENV_FILE_NAME);
             }
+        }
+        if (extraCLIArgs != null && !extraCLIArgs.isEmpty()) {
+            argb.addTokenized(extraCLIArgs);
         }
         launcher.getListener().getLogger().println("Starting launch for: " + argb.toString());
         Launcher.ProcStarter procStarter = launcher.launch();

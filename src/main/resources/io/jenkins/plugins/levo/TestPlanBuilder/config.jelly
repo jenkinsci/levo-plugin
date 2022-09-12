@@ -30,13 +30,17 @@
     <f:entry title="${%Target}" field="target">
         <f:textbox />
     </f:entry>
+    <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
+        <f:textbox />
+    </f:entry>
+    <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
+        <f:checkbox />
+    </f:entry>
     <f:entry field="levoCredentialsId" title="${%Levo Credential}">
         <c:select/>
     </f:entry>
-    <f:advanced>
-        <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
-            <c:select/>
-        </f:entry>
-    </f:advanced>
+    <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
+        <c:select/>
+    </f:entry>
 </j:jelly>
 
