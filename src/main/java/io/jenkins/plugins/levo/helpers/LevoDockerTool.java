@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
     public static final int CLIENT_TIMEOUT = 1800;
+    public static final int PULL_TIMEOUT = 300;
     public static final int CMD_TIMEOUT = 60;
     public static final String ENV_FILE_NAME = "environment.yaml";
     public static final String LEVO_CONFIG_FOLDER_NAME = ".levoconfig";
@@ -46,6 +47,10 @@ public class LevoDockerTool {
 
 
     private static String runAndParseOutput(Launcher launcher, EnvVars envVars, ArgumentListBuilder cmd) throws IOException, InterruptedException {
+        return runAndParseOutput(launcher, envVars, cmd, CMD_TIMEOUT);
+    }
+
+    private static String runAndParseOutput(Launcher launcher, EnvVars envVars, ArgumentListBuilder cmd, int timeout) throws IOException, InterruptedException {
         Launcher.ProcStarter procStarter = launcher.launch();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         procStarter.quiet(false)
@@ -53,7 +58,7 @@ public class LevoDockerTool {
                 .envs(envVars)
                 .stdout(baos)
                 .start()
-                .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+                .joinWithTimeout(timeout, TimeUnit.SECONDS, launcher.getListener());
         return baos.toString(StandardCharsets.UTF_8.name()).trim();
     }
     private static String getUserId(Launcher launcher, EnvVars launchEnv) throws IOException, InterruptedException {
@@ -116,6 +121,21 @@ public class LevoDockerTool {
         return argb;
     }
 
+    private static void runDockerPull(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv) throws IOException, InterruptedException {
+        Node currentNode = Optional.of(run)
+                .map(Run::getExecutor)
+                .map(Executor::getOwner)
+                .map(Computer::getNode)
+                .orElse(null);
+        if (currentNode == null) {
+            throw new IllegalStateException("Run has no executor");
+        }
+        ArgumentListBuilder argb = new ArgumentListBuilder();
+        argb.add(DockerTool.getExecutable(null, currentNode, launcher.getListener(), launchEnv), "pull");
+        argb.add("levoai/levo:stable");
+        runAndParseOutput(launcher, launchEnv, argb, PULL_TIMEOUT);
+    }
+
     public static void runLevoLogin(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, String workdir, Secret authorizationKey, String organizationId) throws IOException, InterruptedException {
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, null, workdir);
         argb.add("login", "-k", authorizationKey.getPlainText(), "-o", organizationId);
@@ -143,6 +163,7 @@ public class LevoDockerTool {
     }
 
     public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs) throws IOException, InterruptedException {
+        runDockerPull(run, launcher, launchEnv);
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir);
 
         argb.add("test", "--target-url", target, "--test-plan", testPlan);
