@@ -16,11 +16,14 @@
 
 package io.jenkins.plugins.levo.credentials;
 
+import java.io.IOException;
+
+import com.cloudbees.plugins.credentials.CredentialsNameProvider;
 import com.cloudbees.plugins.credentials.NameWith;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
-import hudson.util.Secret;
 
-import java.io.IOException;
+import hudson.Extension;
+import hudson.util.Secret;
 
 @NameWith(
         value = LevoCLICredentials.NameProvider.class,
@@ -29,4 +32,17 @@ import java.io.IOException;
 public interface LevoCLICredentials extends StandardCredentials {
     String getOrganizationId();
     Secret getAuthorizationKey() throws IOException, InterruptedException;
+    String getBaseUrl();
+    
+    @Extension
+    class NameProvider extends CredentialsNameProvider<LevoCLICredentials> {
+        @Override
+        public String getName(LevoCLICredentials credentials) {
+            String description = credentials.getDescription();
+            if (description != null && !description.trim().isEmpty()) {
+                return description;
+            }
+            return credentials.getId();
+        }
+    }
 }

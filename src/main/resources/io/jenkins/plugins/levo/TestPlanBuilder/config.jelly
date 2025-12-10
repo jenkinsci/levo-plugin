@@ -24,7 +24,16 @@
         xmlns:f="/lib/form"
         xmlns:c="/lib/credentials"
 >
-    <f:entry title="${%Test Plan}" field="testPlan">
+    <f:entry field="levoCredentialsId" title="${%Levo Credential}">
+        <c:select/>
+    </f:entry>
+    
+    <f:entry title="${%Execution Mode}" field="executionMode">
+        <f:radio name="executionMode" value="testPlan" checked="${instance.executionMode=='testPlan' || instance.executionMode==null}" title="Test Plan LRN" />
+        <f:radio name="executionMode" value="appName" checked="${instance.executionMode=='appName'}" title="Application Name" />
+    </f:entry>
+    
+    <f:entry title="${%Test Plan LRN}" field="testPlan">
         <f:textbox />
     </f:entry>
     <f:entry title="${%Target}" field="target">
@@ -36,9 +45,59 @@
     <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
         <f:checkbox />
     </f:entry>
-    <f:entry field="levoCredentialsId" title="${%Levo Credential}">
-        <c:select/>
-    </f:entry>
+    
+    <f:section title="${%Application Name Configuration}">
+            <f:entry title="${%Application Name}" field="appName">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Environment}" field="environment">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Categories (comma-separated)}" field="categories">
+                <f:textbox default="BOLA,BFLA,INJECTION,SSRF" />
+            </f:entry>
+            
+            <f:entry title="${%HTTP Methods (optional)}" field="httpMethods">
+                <f:textbox placeholder="e.g., GET,POST,PUT" />
+            </f:entry>
+            
+            <f:entry title="${%Exclude Methods (optional)}" field="excludeMethods">
+                <f:textbox placeholder="e.g., DELETE,OPTIONS" />
+            </f:entry>
+            
+            <f:entry title="${%Endpoint Pattern (regex, optional)}" field="endpointPattern">
+                <f:textbox placeholder="e.g., .*api.*" />
+            </f:entry>
+            
+            <f:entry title="${%Exclude Endpoint Pattern (regex, optional)}" field="excludeEndpointPattern">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Target URL (optional)}" field="targetUrl">
+                <f:textbox placeholder="Override app default URL" />
+            </f:entry>
+            
+            <f:advanced>
+                <f:entry title="${%Fail Severity}" field="failSeverity">
+                    <f:select />
+                </f:entry>
+                
+                <f:entry title="${%Fail Scope}" field="failScope">
+                    <f:select />
+                </f:entry>
+                
+                <f:entry title="${%Fail Threshold (optional)}" field="failThreshold">
+                    <f:textbox />
+                </f:entry>
+            </f:advanced>
+    </f:section>
+    
     <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
         <c:select/>
     </f:entry>

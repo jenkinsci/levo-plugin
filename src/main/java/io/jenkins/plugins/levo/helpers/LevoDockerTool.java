@@ -16,6 +16,21 @@
 
 package io.jenkins.plugins.levo.helpers;
 
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+
+import org.jenkinsci.plugins.docker.commons.tools.DockerTool;
+
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import hudson.EnvVars;
@@ -24,18 +39,9 @@ import hudson.model.Computer;
 import hudson.model.Executor;
 import hudson.model.Node;
 import hudson.model.Run;
+import hudson.model.TaskListener;
 import hudson.util.ArgumentListBuilder;
 import hudson.util.Secret;
-import org.jenkinsci.plugins.docker.commons.tools.DockerTool;
-
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 public class LevoDockerTool {
     public static final int CLIENT_TIMEOUT = 1800;
@@ -73,7 +79,7 @@ public class LevoDockerTool {
         return runAndParseOutput(launcher, launchEnv, argb);
     }
 
-    private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir) throws IOException, InterruptedException {
+    private static ArgumentListBuilder buildLevoCommand(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, @Nullable String baseUrl) throws IOException, InterruptedException {
         Node currentNode = Optional.of(run)
                 .map(Run::getExecutor)
                 .map(Executor::getOwner)
@@ -115,6 +121,10 @@ public class LevoDockerTool {
         }
 
         argb.add("-e", "TERM=xterm-256color");
+        
+        // Set API base URL from credentials (defaults to production if not provided)
+        String apiBaseUrl = (baseUrl != null && !baseUrl.trim().isEmpty()) ? baseUrl : "https://api.levo.ai";
+        argb.add("-e", "LEVO_BASE_URL=" + apiBaseUrl);
 
         argb.add("levoai/levo:stable");
 
@@ -136,17 +146,41 @@ public class LevoDockerTool {
         runAndParseOutput(launcher, launchEnv, argb, PULL_TIMEOUT);
     }
 
-    public static void runLevoLogin(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, String workdir, Secret authorizationKey, String organizationId) throws IOException, InterruptedException {
-        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, null, workdir);
-        argb.add("login", "-k", authorizationKey.getPlainText(), "-o", organizationId);
+    public static void runLevoLogin(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, String workdir, Secret authorizationKey, String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+        if (authorizationKey == null || authorizationKey.getPlainText() == null || authorizationKey.getPlainText().trim().isEmpty()) {
+            throw new IllegalArgumentException("Authorization key is missing or empty");
+        }
+        if (organizationId == null || organizationId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Organization ID is missing or empty");
+        }
+        
+        // Clean up any existing credentials before login to ensure fresh authentication
+        cleanupCredentials(workdir, launcher.getListener());
+        
+        // Pull latest Docker image to ensure we're using the most recent version
+        launcher.getListener().getLogger().println("Pulling latest Levo CLI image...");
+        runDockerPull(run, launcher, launchEnv);
+        
+        String apiKey = authorizationKey.getPlainText();
+        // Log masked version for security (show first 3 and last 3 chars)
+        String maskedKey = apiKey.length() > 6 
+            ? apiKey.substring(0, 3) + "..." + apiKey.substring(apiKey.length() - 3)
+            : "***";
+        
+        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, null, workdir, baseUrl);
+        argb.add("login", "-k", apiKey, "-o", organizationId);
 
-        launcher.getListener().getLogger().println("Starting launch for: " + argb.toString());
+        launcher.getListener().getLogger().println("Starting launch for: docker run ... login -k " + maskedKey + " -o " + organizationId);
         Launcher.ProcStarter procStarter = launcher.launch();
-        procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+        int exitCode = procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+        
+        if (exitCode != 0) {
+            throw new IOException("Levo login failed with exit code: " + exitCode + ". Please verify your API key and organization ID are correct.");
+        }
     }
 
     public static void runLevoConformanceTest(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String schema) throws IOException, InterruptedException {
-        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir);
+        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, null);
 
         argb.add("test-conformance", "--target-url", target, "--schema", schema);
 
@@ -162,11 +196,17 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
-        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir);
+        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
 
         argb.add("test", "--target-url", target, "--test-plan", testPlan);
+        
+        // Add organization ID as CLI flag (required for backend to propagate OrganizationId header)
+        if (organizationId != null && !organizationId.trim().isEmpty()) {
+            argb.add("--organization", organizationId);
+        }
+        
         if (generateJUnitReports != null && generateJUnitReports) {
             argb.add("--export-junit-xml=/home/levo/reports/junit.xml");
         }
@@ -187,17 +227,143 @@ public class LevoDockerTool {
         Launcher.ProcStarter procStarter = launcher.launch();
         try {
             procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
-        } catch (InterruptedException e) {
-            // Job aborted
+        } finally {
+            // Always clean up credentials after run
             afterRunCleanUp(workdir);
-            throw e;
+        }
+    }
+
+    public static void runLevoRemoteTestRun(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir,
+                                             String appName, String environment, String categories, String httpMethods, String excludeMethods,
+                                             String endpointPattern, String excludeEndpointPattern, String testUsers, String targetUrl,
+                                             String failSeverity, String failScope, String failThreshold,
+                                             Secret authorizationKey, String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+        runDockerPull(run, launcher, launchEnv);
+        ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
+
+        argb.add("remote-test-run");
+        
+        // Required parameters
+        if (appName != null && !appName.trim().isEmpty()) {
+            argb.add("--app-name", appName);
+        }
+        if (environment != null && !environment.trim().isEmpty()) {
+            argb.add("--env", environment);
+        }
+        
+        // Optional filter parameters
+        if (categories != null && !categories.trim().isEmpty()) {
+            argb.add("--categories", categories);
+        }
+        if (httpMethods != null && !httpMethods.trim().isEmpty()) {
+            argb.add("--methods", httpMethods);
+        }
+        if (excludeMethods != null && !excludeMethods.trim().isEmpty()) {
+            argb.add("--exclude-methods", excludeMethods);
+        }
+        if (endpointPattern != null && !endpointPattern.trim().isEmpty()) {
+            argb.add("--endpoint-pattern", endpointPattern);
+        }
+        if (excludeEndpointPattern != null && !excludeEndpointPattern.trim().isEmpty()) {
+            argb.add("--exclude-endpoint-pattern", excludeEndpointPattern);
+        }
+        if (testUsers != null && !testUsers.trim().isEmpty()) {
+            argb.add("--test-users", testUsers);
+        }
+        if (targetUrl != null && !targetUrl.trim().isEmpty()) {
+            argb.add("--target-url", targetUrl);
+        }
+        
+        // Failure criteria
+        if (failSeverity != null && !failSeverity.trim().isEmpty() && !"none".equals(failSeverity)) {
+            argb.add("--fail-severity", failSeverity);
+        }
+        if (failScope != null && !failScope.trim().isEmpty() && !"none".equals(failScope)) {
+            argb.add("--fail-scope", failScope);
+        }
+        if (failThreshold != null && !failThreshold.trim().isEmpty()) {
+            argb.add("--fail-threshold", failThreshold);
+        }
+        
+        // Authentication (required)
+        argb.add("--key", authorizationKey.getPlainText());
+        argb.add("--organization", organizationId);
+        
+        // Verbosity
+        argb.add("--verbosity", "INFO");
+
+        launcher.getListener().getLogger().println("Starting remote test run: " + argb.toString());
+        Launcher.ProcStarter procStarter = launcher.launch();
+        try {
+            procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
+        } finally {
+            // Always clean up credentials after run
+            afterRunCleanUp(workdir);
+        }
+    }
+
+    /**
+     * Clean up credentials directory to ensure fresh authentication on each run
+     */
+    private static void cleanupCredentials(String workdir, TaskListener listener) throws IOException {
+        Path configPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
+        if (Files.exists(configPath)) {
+            try {
+                // Delete all files in the config directory
+                Files.walk(configPath)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Log but don't fail if cleanup has issues
+                            if (listener != null) {
+                                listener.getLogger().println("Warning: Could not delete " + path + ": " + e.getMessage());
+                            }
+                        }
+                    });
+                if (listener != null) {
+                    listener.getLogger().println("Cleaned up existing credentials for fresh authentication.");
+                }
+            } catch (IOException e) {
+                // If walk fails, try simple delete
+                try {
+                    Files.delete(configPath);
+                } catch (IOException e2) {
+                    if (listener != null) {
+                        listener.getLogger().println("Warning: Could not clean up credentials directory: " + e2.getMessage());
+                    }
+                }
+            }
         }
     }
 
     private static void afterRunCleanUp(String workdir) throws IOException {
         Path envPath = Paths.get(workdir, ENV_FILE_NAME);
         Path configPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
-        Files.delete(envPath);
-        Files.delete(configPath);
+        if (Files.exists(envPath)) {
+            Files.delete(envPath);
+        }
+        // Clean up credentials after run
+        if (Files.exists(configPath)) {
+            try {
+                Files.walk(configPath)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Ignore cleanup errors
+                        }
+                    });
+            } catch (IOException e) {
+                // If walk fails, try simple delete
+                try {
+                    Files.delete(configPath);
+                } catch (IOException e2) {
+                    // Ignore cleanup errors
+                }
+            }
+        }
     }
 }
