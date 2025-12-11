@@ -5,6 +5,6 @@
 buildPlugin(
     useContainerAgent: true,
     configurations: [
-        [platform: 'linux', jdk: '21']
+        [platform: 'linux', jdk: 21] // Use integer 21, not '21'
     ]
 )
