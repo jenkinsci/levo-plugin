@@ -31,6 +31,7 @@ import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
@@ -401,21 +402,33 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                         CredentialsMatchers.anyOf(CredentialsMatchers.instanceOf(FileCredentials.class), CredentialsMatchers.instanceOf(StringCredentials.class)));
             }
 
-            public FormValidation doCheckAppName(@QueryParameter String value, @QueryParameter String executionMode) {
+            @RequirePOST
+            public FormValidation doCheckAppName(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
                 if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
                     return FormValidation.error("Application name is required when using app-based testing");
                 }
                 return FormValidation.ok();
             }
 
-            public FormValidation doCheckEnvironment(@QueryParameter String value, @QueryParameter String executionMode) {
+            @RequirePOST
+            public FormValidation doCheckEnvironment(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
                 if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
                     return FormValidation.error("Environment is required when using app-based testing");
                 }
                 return FormValidation.ok();
             }
 
-            public FormValidation doCheckEndpointPattern(@QueryParameter String value) {
+            @RequirePOST
+            public FormValidation doCheckEndpointPattern(@AncestorInPath Item item, @QueryParameter String value) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
                 if (value != null && !value.trim().isEmpty()) {
                     try {
                         Pattern.compile(value);
@@ -427,7 +440,11 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 return FormValidation.ok();
             }
 
-            public FormValidation doCheckExcludeEndpointPattern(@QueryParameter String value) {
+            @RequirePOST
+            public FormValidation doCheckExcludeEndpointPattern(@AncestorInPath Item item, @QueryParameter String value) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
                 if (value != null && !value.trim().isEmpty()) {
                     try {
                         Pattern.compile(value);
@@ -439,7 +456,11 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 return FormValidation.ok();
             }
 
-            public FormValidation doCheckTestUsers(@QueryParameter String value) {
+            @RequirePOST
+            public FormValidation doCheckTestUsers(@AncestorInPath Item item, @QueryParameter String value) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
                 if (value != null && !value.trim().isEmpty()) {
                     String[] userArray = value.split(",");
                     for (String user : userArray) {
