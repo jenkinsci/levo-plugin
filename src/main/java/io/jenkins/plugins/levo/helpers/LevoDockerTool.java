@@ -196,7 +196,7 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String testUsers, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
 
@@ -205,6 +205,17 @@ public class LevoDockerTool {
         // Add organization ID as CLI flag (required for backend to propagate OrganizationId header)
         if (organizationId != null && !organizationId.trim().isEmpty()) {
             argb.add("--organization", organizationId);
+        }
+        
+        // Parse comma-separated test users and add --test-user flag for each
+        if (testUsers != null && !testUsers.trim().isEmpty()) {
+            String[] userArray = testUsers.split(",");
+            for (String user : userArray) {
+                String trimmedUser = user.trim();
+                if (!trimmedUser.isEmpty()) {
+                    argb.add("--test-user", trimmedUser);
+                }
+            }
         }
         
         if (generateJUnitReports != null && generateJUnitReports) {
@@ -267,8 +278,15 @@ public class LevoDockerTool {
         if (excludeEndpointPattern != null && !excludeEndpointPattern.trim().isEmpty()) {
             argb.add("--exclude-endpoint-pattern", excludeEndpointPattern);
         }
+        // Parse comma-separated test users and add --test-user flag for each
         if (testUsers != null && !testUsers.trim().isEmpty()) {
-            argb.add("--test-users", testUsers);
+            String[] userArray = testUsers.split(",");
+            for (String user : userArray) {
+                String trimmedUser = user.trim();
+                if (!trimmedUser.isEmpty()) {
+                    argb.add("--test-user", trimmedUser);
+                }
+            }
         }
         if (targetUrl != null && !targetUrl.trim().isEmpty()) {
             argb.add("--target-url", targetUrl);

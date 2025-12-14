@@ -33,11 +33,17 @@
         <f:radio name="executionMode" value="appName" checked="${instance.executionMode=='appName'}" title="Application Name" />
     </f:entry>
     
+    <!-- Test Plan LRN Configuration Section -->
+    <div id="testPlanConfig">
     <f:entry title="${%Test Plan LRN}" field="testPlan">
         <f:textbox />
     </f:entry>
     <f:entry title="${%Target}" field="target">
         <f:textbox />
+    </f:entry>
+    <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
+        <f:textbox placeholder="e.g., Victim1,Victim2" />
+        <f:description>Test user name(s) to use. Can be specified multiple times (comma-separated). If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
     </f:entry>
     <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
         <f:textbox />
@@ -45,7 +51,13 @@
     <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
         <f:checkbox />
     </f:entry>
+    <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
+        <c:select/>
+    </f:entry>
+    </div>
     
+    <!-- Application Name Configuration Section -->
+    <div id="appNameConfig">
     <f:section title="${%Application Name Configuration}">
             <f:entry title="${%Application Name}" field="appName">
                 <f:textbox />
@@ -55,8 +67,107 @@
                 <f:textbox />
             </f:entry>
             
-            <f:entry title="${%Categories (comma-separated)}" field="categories">
-                <f:textbox default="BOLA,BFLA,INJECTION,SSRF" />
+            <f:entry title="${%Categories}" field="categories">
+                <f:description>Select test categories to run. You can also manually edit the text field below to add custom categories.</f:description>
+                
+                <div style="margin-top: 15px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: normal; font-size: inherit;">Susceptible Categories</span>
+                        <div>
+                            <a href="javascript:void(0)" onclick="selectAllSusceptible()" style="color: #0066cc; margin-right: 10px; text-decoration: none;">Select all</a>
+                            <a href="javascript:void(0)" onclick="clearAllSusceptible()" style="color: #333; text-decoration: none;">Clear all</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBROKEN_USER_AUTH" value="BROKEN_USER_AUTH" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken User Authentication
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCORS" value="CORS" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            CORS
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catFUZZING" value="FUZZING" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Fuzzing
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catMASS_ASSIGNMENT" value="MASS_ASSIGNMENT" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Mass Assignment
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catNOSQL_INJECTION" value="NOSQL_INJECTION" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            NoSQL Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCOMMAND_INJECTION" value="COMMAND_INJECTION" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Command Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catRATE_LIMIT" value="RATE_LIMIT" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Rate Limit
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catREMOTE_CODE_EXECUTION" value="REMOTE_CODE_EXECUTION" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Remote Code Execution
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSQL_INJECTION" value="SQL_INJECTION" class="susceptible-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            SQL Injection
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: normal; font-size: inherit;">Other Categories</span>
+                        <div>
+                            <a href="javascript:void(0)" onclick="selectAllOther()" style="color: #0066cc; margin-right: 10px; text-decoration: none;">Select all</a>
+                            <a href="javascript:void(0)" onclick="clearAllOther()" style="color: #333; text-decoration: none;">Clear all</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBOLA" value="BOLA" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken Object Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBFLA" value="BFLA" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken Function Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDEFAULT_REQUEST_CHECKS" value="DEFAULT_REQUEST_CHECKS" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Default Request Checks
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSSRF" value="SSRF" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Server Side Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catADVANCED_BOLA" value="ADVANCED_BOLA" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Advanced BOLA
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSCHEMA_CONFORMANCE" value="SCHEMA_CONFORMANCE" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Schema Conformance
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catGRAPHQL_INFO_LEAK" value="GRAPHQL_INFO_LEAK" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Graphql Info Leak
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCSRF" value="CSRF" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Cross-Site Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDENIAL_OF_SERVICE" value="DENIAL_OF_SERVICE" class="other-cat" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Denial of Service
+                        </label>
+                    </div>
+                </div>
+                
+                <f:textbox field="categories" default="BOLA,BFLA,INJECTION,SSRF" />
+                <f:description>Categories as comma-separated values. Checkboxes above will update this field, or you can edit manually to add custom categories.</f:description>
             </f:entry>
             
             <f:entry title="${%HTTP Methods (optional)}" field="httpMethods">
@@ -76,7 +187,8 @@
             </f:entry>
             
             <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
-                <f:textbox />
+                <f:textbox placeholder="e.g., Victim1,Victim2" />
+                <f:description>Test user name(s) to use. Can be specified multiple times (comma-separated). If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
             </f:entry>
             
             <f:entry title="${%Target URL (optional)}" field="targetUrl">
@@ -96,10 +208,268 @@
                     <f:textbox />
                 </f:entry>
             </f:advanced>
-    </f:section>
+        </f:section>
+    </div>
     
-    <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
-        <c:select/>
-    </f:entry>
+    <script>
+        <![CDATA[
+        function updateExecutionMode() {
+            var testPlanConfig = document.getElementById('testPlanConfig');
+            var appNameConfig = document.getElementById('appNameConfig');
+            
+            if (!testPlanConfig || !appNameConfig) {
+                return;
+            }
+            
+            // Find the checked radio button - try multiple selectors for Jenkins compatibility
+            var radios = document.querySelectorAll('input[type="radio"]');
+            var selectedValue = null;
+            
+            for (var i = 0; i < radios.length; i++) {
+                var name = radios[i].getAttribute('name') || '';
+                var value = radios[i].value || '';
+                if ((name.indexOf('executionMode') !== -1 || name === 'executionMode') && 
+                    (value === 'testPlan' || value === 'appName') && 
+                    radios[i].checked) {
+                    selectedValue = value;
+                    break;
+                }
+            }
+            
+            if (selectedValue === 'testPlan' || selectedValue === null) {
+                testPlanConfig.style.display = 'block';
+                appNameConfig.style.display = 'none';
+            } else if (selectedValue === 'appName') {
+                testPlanConfig.style.display = 'none';
+                appNameConfig.style.display = 'block';
+            }
+        }
+        
+        // Use event delegation for dynamic forms
+        function attachListeners() {
+            var form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('change', function(e) {
+                    if (e.target && e.target.type === 'radio' && 
+                        (e.target.value === 'testPlan' || e.target.value === 'appName')) {
+                        updateExecutionMode();
+                    }
+                });
+            }
+            
+            // Also attach directly to radios if they exist
+            var radios = document.querySelectorAll('input[type="radio"]');
+            for (var i = 0; i < radios.length; i++) {
+                var value = radios[i].value || '';
+                if (value === 'testPlan' || value === 'appName') {
+                    radios[i].addEventListener('change', updateExecutionMode);
+                }
+            }
+        }
+        
+        // Initialize on page load
+        function init() {
+            updateExecutionMode();
+            attachListeners();
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(init, 100);
+            });
+        } else {
+            setTimeout(init, 100);
+        }
+        
+        // Also run after a delay to catch dynamically loaded content
+        setTimeout(init, 500);
+        
+        // Category checkbox functions
+        function updateCategoriesField() {
+            var categories = [];
+            // Get all checked checkboxes (both susceptible and other categories)
+            var allCheckboxes = document.querySelectorAll('input[type="checkbox"][id^="cat"]:checked');
+            
+            for (var i = 0; i < allCheckboxes.length; i++) {
+                if (allCheckboxes[i].value) {
+                    categories.push(allCheckboxes[i].value);
+                }
+            }
+            
+            // Find the categories text field - it might have a generated name
+            var categoriesField = findCategoriesField();
+            if (categoriesField) {
+                // Get existing custom categories (not in our checkbox list)
+                var existingValue = categoriesField.value || '';
+                var existingCategories = existingValue.split(',').map(function(c) { return c.trim(); });
+                var knownCategories = [
+                    'BOLA', 'BFLA', 'SSRF', 'CORS', 'BROKEN_USER_AUTH', 'FUZZING', 'MASS_ASSIGNMENT',
+                    'NOSQL_INJECTION', 'COMMAND_INJECTION', 'RATE_LIMIT', 'REMOTE_CODE_EXECUTION',
+                    'SQL_INJECTION', 'INJECTION', 'DEFAULT_REQUEST_CHECKS', 'ADVANCED_BOLA', 'SCHEMA_CONFORMANCE',
+                    'GRAPHQL_INFO_LEAK', 'CSRF', 'DENIAL_OF_SERVICE', 'AUTH', 'XSS', 'IDOR'
+                ];
+                
+                // Keep categories that aren't in our known list
+                var customCategories = existingCategories.filter(function(cat) {
+                    return cat && knownCategories.indexOf(cat.toUpperCase()) === -1;
+                });
+                
+                // Combine checkbox categories with custom categories
+                var allCategories = categories.concat(customCategories);
+                categoriesField.value = allCategories.join(',');
+            }
+        }
+        
+        function selectAllSusceptible() {
+            var checkboxes = document.querySelectorAll('.susceptible-cat');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = true;
+            }
+            updateCategoriesField();
+        }
+        
+        function clearAllSusceptible() {
+            var checkboxes = document.querySelectorAll('.susceptible-cat');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = false;
+            }
+            updateCategoriesField();
+        }
+        
+        function selectAllOther() {
+            var checkboxes = document.querySelectorAll('.other-cat');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = true;
+            }
+            updateCategoriesField();
+        }
+        
+        function clearAllOther() {
+            var checkboxes = document.querySelectorAll('.other-cat');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = false;
+            }
+            updateCategoriesField();
+        }
+        
+        function updateCategoriesCheckboxes() {
+            var categoriesField = findCategoriesField();
+            if (!categoriesField) return;
+            
+            var value = categoriesField.value || '';
+            var categories = value.split(',').map(function(c) { return c.trim().toUpperCase(); });
+            
+            var checkboxMap = {
+                'BOLA': 'catBOLA',
+                'BFLA': 'catBFLA',
+                'SSRF': 'catSSRF',
+                'CORS': 'catCORS',
+                'BROKEN_USER_AUTH': 'catBROKEN_USER_AUTH',
+                'FUZZING': 'catFUZZING',
+                'MASS_ASSIGNMENT': 'catMASS_ASSIGNMENT',
+                'NOSQL_INJECTION': 'catNOSQL_INJECTION',
+                'COMMAND_INJECTION': 'catCOMMAND_INJECTION',
+                'RATE_LIMIT': 'catRATE_LIMIT',
+                'REMOTE_CODE_EXECUTION': 'catREMOTE_CODE_EXECUTION',
+                'SQL_INJECTION': 'catSQL_INJECTION',
+                'DEFAULT_REQUEST_CHECKS': 'catDEFAULT_REQUEST_CHECKS',
+                'ADVANCED_BOLA': 'catADVANCED_BOLA',
+                'SCHEMA_CONFORMANCE': 'catSCHEMA_CONFORMANCE',
+                'GRAPHQL_INFO_LEAK': 'catGRAPHQL_INFO_LEAK',
+                'CSRF': 'catCSRF',
+                'DENIAL_OF_SERVICE': 'catDENIAL_OF_SERVICE',
+                // Also support legacy/alternative names
+                'INJECTION': 'catSQL_INJECTION', // Map generic INJECTION to SQL_INJECTION
+                'AUTH': 'catBROKEN_USER_AUTH',
+                'XSS': 'catCSRF', // XSS might map to CSRF or be separate
+                'IDOR': 'catBOLA' // IDOR is similar to BOLA
+            };
+            
+            // Uncheck all first
+            var allCheckboxes = document.querySelectorAll('input[type="checkbox"][id^="cat"]');
+            for (var j = 0; j < allCheckboxes.length; j++) {
+                allCheckboxes[j].checked = false;
+            }
+            
+            // Check the ones that are in the field
+            for (var i = 0; i < categories.length; i++) {
+                var cat = categories[i];
+                if (checkboxMap[cat]) {
+                    var checkbox = document.getElementById(checkboxMap[cat]);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        }
+        
+        function findCategoriesField() {
+            // Try multiple strategies to find the categories text field
+            // Strategy 1: Look for input with name containing 'categories'
+            var fields = document.querySelectorAll('input[type="text"]');
+            for (var i = 0; i < fields.length; i++) {
+                var name = fields[i].getAttribute('name') || '';
+                var id = fields[i].getAttribute('id') || '';
+                if (name.indexOf('categories') !== -1 || id.indexOf('categories') !== -1) {
+                    return fields[i];
+                }
+            }
+            
+            // Strategy 2: Look for field near our checkboxes (same parent container)
+            var catBOLA = document.getElementById('catBOLA');
+            if (catBOLA) {
+                // Walk up the DOM to find the entry container
+                var current = catBOLA.parentElement;
+                var maxDepth = 10;
+                while (current && maxDepth-- > 0) {
+                    var textFields = current.querySelectorAll('input[type="text"]');
+                    for (var j = 0; j < textFields.length; j++) {
+                        var field = textFields[j];
+                        // Make sure it's not a checkbox or other input type
+                        if (field.type === 'text') {
+                            return field;
+                        }
+                    }
+                    current = current.parentElement;
+                }
+            }
+            
+            // Strategy 3: Look for text field in appNameConfig section
+            var appNameConfig = document.getElementById('appNameConfig');
+            if (appNameConfig) {
+                var textFields = appNameConfig.querySelectorAll('input[type="text"]');
+                // The categories field should be early in the form, try the first few
+                for (var k = 0; k < Math.min(5, textFields.length); k++) {
+                    var field = textFields[k];
+                    var name = field.getAttribute('name') || '';
+                    if (name.indexOf('categories') !== -1) {
+                        return field;
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        // Initialize categories checkboxes on page load
+        function initCategories() {
+            setTimeout(function() {
+                updateCategoriesCheckboxes();
+                var categoriesField = findCategoriesField();
+                if (categoriesField) {
+                    categoriesField.addEventListener('change', updateCategoriesCheckboxes);
+                    categoriesField.addEventListener('input', updateCategoriesCheckboxes);
+                }
+            }, 200);
+        }
+        
+        // Call initCategories when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCategories);
+        } else {
+            initCategories();
+        }
+        ]]>
+    </script>
 </j:jelly>
 

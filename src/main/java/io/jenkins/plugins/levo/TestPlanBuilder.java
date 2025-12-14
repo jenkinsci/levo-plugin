@@ -319,7 +319,7 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             );
         } else {
             // Existing approach: Use test with test-plan
-            LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environmentFileContent, this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
+            LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environmentFileContent, this.generateJunitReport, this.extraCLIArgs, this.testUsers, credentials.getOrganizationId(), credentials.getBaseUrl());
         }
     }
 
@@ -434,6 +434,19 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                         return FormValidation.ok();
                     } catch (PatternSyntaxException e) {
                         return FormValidation.error("Invalid regex pattern: " + e.getMessage());
+                    }
+                }
+                return FormValidation.ok();
+            }
+
+            public FormValidation doCheckTestUsers(@QueryParameter String value) {
+                if (value != null && !value.trim().isEmpty()) {
+                    String[] userArray = value.split(",");
+                    for (String user : userArray) {
+                        String trimmedUser = user.trim();
+                        if (trimmedUser.isEmpty()) {
+                            return FormValidation.warning("Empty test user name found. Please remove empty entries or use comma-separated format: User1,User2");
+                        }
                     }
                 }
                 return FormValidation.ok();

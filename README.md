@@ -50,6 +50,7 @@ This mode uses a pre-configured test plan from your Levo organization.
 **Configuration:**
 - **Test Plan LRN**: The test plan identifier. Go to the Test Plan section of your Levo organization and click the "Copy LRN" button on the selected test plan.
 - **Target**: The target URL to test
+- **Test Users**: Comma-separated test user names (optional). If not specified, uses default user. Test users must be configured in Levo SaaS first.
 - **Extra CLI Arguments**: Additional command-line arguments (optional)
 - **Generate JUnit Reports**: Check to generate JUnit XML reports
 
@@ -67,7 +68,7 @@ This mode automatically creates and runs tests based on your application configu
 - **Exclude Methods**: Comma-separated methods to exclude (e.g., DELETE,OPTIONS)
 - **Endpoint Pattern**: Regex pattern to include specific endpoints (e.g., `.*api.*`)
 - **Exclude Endpoint Pattern**: Regex pattern to exclude endpoints
-- **Test Users**: Comma-separated IAM test users
+- **Test Users**: Comma-separated test user names (optional). If not specified, uses default user. Test users must be configured in Levo SaaS first.
 - **Target URL**: Override the app's default target URL
 
 **Failure Criteria (Advanced):**
@@ -82,9 +83,17 @@ Environment: production
 Categories: BOLA,BFLA
 HTTP Methods: GET,POST,PUT
 Endpoint Pattern: .*api/v1.*
+Test Users: Victim1,Victim2
 Fail Severity: high
 Fail Scope: new
 ```
+
+**Test User Selection:**
+- Test users allow you to specify which authenticated users (configured in Levo SaaS) should be used when running tests
+- Multiple test users can be specified as comma-separated values (e.g., `Victim1,Victim2`)
+- The plugin will pass each test user to the CLI using the `--test-user` flag
+- If no test users are specified, the default test user for the app/environment will be used
+- Test users must be configured in Levo SaaS before they can be used in Jenkins jobs
 
 #### Environment File (Optional)
 
