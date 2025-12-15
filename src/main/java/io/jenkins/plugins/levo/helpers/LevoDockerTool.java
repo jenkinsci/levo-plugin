@@ -196,26 +196,42 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String testUsers, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String appName, @Nullable String env, @Nullable String categories, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
 
-        argb.add("test", "--target-url", target, "--test-plan", testPlan);
+        argb.add("test");
         
         // Add organization ID as CLI flag (required for backend to propagate OrganizationId header)
         if (organizationId != null && !organizationId.trim().isEmpty()) {
             argb.add("--organization", organizationId);
         }
         
-        // Parse comma-separated test users and add --test-user flag for each
-        if (testUsers != null && !testUsers.trim().isEmpty()) {
-            String[] userArray = testUsers.split(",");
-            for (String user : userArray) {
-                String trimmedUser = user.trim();
-                if (!trimmedUser.isEmpty()) {
-                    argb.add("--test-user", trimmedUser);
-                }
+        // Support app-name mode (mutually exclusive with test-plan)
+        if (appName != null && !appName.trim().isEmpty()) {
+            if (testPlan != null && !testPlan.trim().isEmpty()) {
+                throw new IllegalArgumentException("--app-name cannot be used with --test-plan");
             }
+            argb.add("--app-name", appName);
+            if (env == null || env.trim().isEmpty()) {
+                throw new IllegalArgumentException("--env is required when using --app-name");
+            }
+            argb.add("--env", env);
+            if (categories != null && !categories.trim().isEmpty()) {
+                argb.add("--categories", categories);
+            }
+        } else if (testPlan != null && !testPlan.trim().isEmpty()) {
+            // Use existing test-plan mode
+            argb.add("--test-plan", testPlan);
+        } else {
+            throw new IllegalArgumentException("One of --test-plan or --app-name must be provided");
+        }
+        
+        // Target URL is required unless using app-name (which can use default from app config)
+        if (target != null && !target.trim().isEmpty()) {
+            argb.add("--target-url", target);
+        } else if (appName == null || appName.trim().isEmpty()) {
+            throw new IllegalArgumentException("--target-url is required when using --test-plan");
         }
         
         if (generateJUnitReports != null && generateJUnitReports) {
@@ -247,6 +263,7 @@ public class LevoDockerTool {
     public static void runLevoRemoteTestRun(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir,
                                              String appName, String environment, String categories, String httpMethods, String excludeMethods,
                                              String endpointPattern, String excludeEndpointPattern, String testUsers, String targetUrl,
+                                             String testMode, String runOn,
                                              String failSeverity, String failScope, String failThreshold,
                                              Secret authorizationKey, String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
@@ -261,6 +278,23 @@ public class LevoDockerTool {
         if (environment != null && !environment.trim().isEmpty()) {
             argb.add("--env", environment);
         }
+        
+        // Required: Test Mode
+        if (testMode == null || testMode.trim().isEmpty()) {
+            throw new IllegalArgumentException("--test-mode is required");
+        }
+        argb.add("--test-mode", testMode);
+        
+        // Required: Run On
+        if (runOn == null || runOn.trim().isEmpty()) {
+            throw new IllegalArgumentException("--run-on is required");
+        }
+        // Normalize on-premises variations
+        String normalizedRunOn = runOn.trim();
+        if ("onprem".equalsIgnoreCase(normalizedRunOn) || "on-premises".equalsIgnoreCase(normalizedRunOn)) {
+            normalizedRunOn = "on-premises";
+        }
+        argb.add("--run-on", normalizedRunOn);
         
         // Optional filter parameters
         if (categories != null && !categories.trim().isEmpty()) {
@@ -278,15 +312,9 @@ public class LevoDockerTool {
         if (excludeEndpointPattern != null && !excludeEndpointPattern.trim().isEmpty()) {
             argb.add("--exclude-endpoint-pattern", excludeEndpointPattern);
         }
-        // Parse comma-separated test users and add --test-user flag for each
+        // Parse comma-separated test users and add --test-users flag (only used in DataDriven mode)
         if (testUsers != null && !testUsers.trim().isEmpty()) {
-            String[] userArray = testUsers.split(",");
-            for (String user : userArray) {
-                String trimmedUser = user.trim();
-                if (!trimmedUser.isEmpty()) {
-                    argb.add("--test-user", trimmedUser);
-                }
-            }
+            argb.add("--test-users", testUsers);
         }
         if (targetUrl != null && !targetUrl.trim().isEmpty()) {
             argb.add("--target-url", targetUrl);

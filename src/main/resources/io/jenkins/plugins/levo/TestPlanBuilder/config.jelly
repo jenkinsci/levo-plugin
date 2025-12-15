@@ -37,13 +37,11 @@
     <div id="testPlanConfig">
     <f:entry title="${%Test Plan LRN}" field="testPlan">
         <f:textbox />
+        <f:description>Test plan LRN identifier. Use Application Name mode to create a test plan dynamically.</f:description>
     </f:entry>
     <f:entry title="${%Target}" field="target">
         <f:textbox />
-    </f:entry>
-    <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
-        <f:textbox placeholder="e.g., Victim1,Victim2" />
-        <f:description>Test user name(s) to use. Can be specified multiple times (comma-separated). If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
+        <f:description>Target URL to test. Required when using Test Plan LRN.</f:description>
     </f:entry>
     <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
         <f:textbox />
@@ -65,6 +63,16 @@
             
             <f:entry title="${%Environment}" field="environment">
                 <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Test Mode}" field="testMode">
+                <f:select />
+                <f:description>Required. DataDriven requires test users. Traces uses traces for authentication.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Run On}" field="runOn">
+                <f:select />
+                <f:description>Required. Where to execute the test run - Cloud or On-Premises.</f:description>
             </f:entry>
             
             <f:entry title="${%Categories}" field="categories">
@@ -166,8 +174,10 @@
                     </div>
                 </div>
                 
-                <f:textbox field="categories" default="BOLA,BFLA,INJECTION,SSRF" />
-                <f:description>Categories as comma-separated values. Checkboxes above will update this field, or you can edit manually to add custom categories.</f:description>
+                <div id="categoriesTextFieldContainer">
+                    <f:textbox field="categories" default="BOLA,BFLA,INJECTION,SSRF" />
+                    <f:description>Categories as comma-separated values. Checkboxes above will update this field, or you can edit manually to add custom categories.</f:description>
+                </div>
             </f:entry>
             
             <f:entry title="${%HTTP Methods (optional)}" field="httpMethods">
@@ -404,47 +414,68 @@
         }
         
         function findCategoriesField() {
-            // Try multiple strategies to find the categories text field
-            // Strategy 1: Look for input with name containing 'categories'
-            var fields = document.querySelectorAll('input[type="text"]');
-            for (var i = 0; i < fields.length; i++) {
-                var name = fields[i].getAttribute('name') || '';
-                var id = fields[i].getAttribute('id') || '';
-                if (name.indexOf('categories') !== -1 || id.indexOf('categories') !== -1) {
-                    return fields[i];
+            // Strategy 1: Try to find via wrapper container ID (most reliable)
+            var container = document.getElementById('categoriesTextFieldContainer');
+            if (container) {
+                var field = container.querySelector('input[type="text"]');
+                if (field) {
+                    return field;
                 }
             }
             
-            // Strategy 2: Look for field near our checkboxes (same parent container)
+            // Strategy 2: Look for the text field that comes after the category checkboxes
+            // The checkboxes are in a div, and the text field is in an f:entry below them
             var catBOLA = document.getElementById('catBOLA');
             if (catBOLA) {
-                // Walk up the DOM to find the entry container
+                // Find the parent Categories entry container
                 var current = catBOLA.parentElement;
-                var maxDepth = 10;
+                var maxDepth = 15;
                 while (current && maxDepth-- > 0) {
+                    // Look for an f:entry or div that contains "Categories" and has a text input
                     var textFields = current.querySelectorAll('input[type="text"]');
-                    for (var j = 0; j < textFields.length; j++) {
-                        var field = textFields[j];
-                        // Make sure it's not a checkbox or other input type
-                        if (field.type === 'text') {
+                    for (var i = 0; i < textFields.length; i++) {
+                        var field = textFields[i];
+                        var name = field.getAttribute('name') || '';
+                        // Check if this is the categories field by looking at its name attribute
+                        if (name.indexOf('categories') !== -1) {
                             return field;
+                        }
+                        // Also check if it's in a container with "comma-separated" text (description)
+                        var parent = field.parentElement;
+                        var checkParent = parent;
+                        var checkDepth = 5;
+                        while (checkParent && checkDepth-- > 0) {
+                            var text = checkParent.textContent || '';
+                            if (text.indexOf('comma-separated') !== -1 && text.indexOf('Categories') !== -1) {
+                                return field;
+                            }
+                            checkParent = checkParent.parentElement;
                         }
                     }
                     current = current.parentElement;
                 }
             }
             
-            // Strategy 3: Look for text field in appNameConfig section
+            // Strategy 3: Look specifically in appNameConfig section
             var appNameConfig = document.getElementById('appNameConfig');
             if (appNameConfig) {
-                var textFields = appNameConfig.querySelectorAll('input[type="text"]');
-                // The categories field should be early in the form, try the first few
-                for (var k = 0; k < Math.min(5, textFields.length); k++) {
-                    var field = textFields[k];
+                // Find all text inputs and check their names
+                var allInputs = appNameConfig.querySelectorAll('input[type="text"]');
+                for (var j = 0; j < allInputs.length; j++) {
+                    var field = allInputs[j];
                     var name = field.getAttribute('name') || '';
                     if (name.indexOf('categories') !== -1) {
                         return field;
                     }
+                }
+            }
+            
+            // Strategy 4: Fallback - look for any input with 'categories' in name
+            var allFields = document.querySelectorAll('input[type="text"]');
+            for (var k = 0; k < allFields.length; k++) {
+                var name = allFields[k].getAttribute('name') || '';
+                if (name.indexOf('categories') !== -1) {
+                    return allFields[k];
                 }
             }
             

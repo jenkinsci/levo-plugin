@@ -82,6 +82,10 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     private String testUsers;
     private String targetUrl;
     
+    // New required fields for remote-test-run
+    private String testMode; // "DataDriven" or "Traces"
+    private String runOn;    // "cloud" or "on-premises"
+    
     // Failure criteria
     private String failSeverity; // "none", "low", "medium", "high", "critical"
     private String failScope; // "none", "new", "any"
@@ -251,6 +255,24 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         return targetUrl;
     }
     
+    public String getTestMode() {
+        return testMode;
+    }
+    
+    @DataBoundSetter
+    public void setTestMode(String testMode) {
+        this.testMode = testMode;
+    }
+    
+    public String getRunOn() {
+        return runOn;
+    }
+    
+    @DataBoundSetter
+    public void setRunOn(String runOn) {
+        this.runOn = runOn;
+    }
+    
     public String getFailSeverity() {
         return failSeverity;
     }
@@ -315,12 +337,16 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace),
                 appName, this.environment, categories, httpMethods, excludeMethods,
                 endpointPattern, excludeEndpointPattern, testUsers, targetUrl,
+                this.testMode, this.runOn,
                 failSeverity, failScope, failThreshold,
                 credentials.getAuthorizationKey(), credentials.getOrganizationId(), credentials.getBaseUrl()
             );
         } else {
-            // Existing approach: Use test with test-plan
-            LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), target, testPlan, environmentFileContent, this.generateJunitReport, this.extraCLIArgs, this.testUsers, credentials.getOrganizationId(), credentials.getBaseUrl());
+            // Existing approach: Use test with test-plan or app-name
+            // Support both test-plan mode and app-name mode for levo test command
+            LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
+                target, testPlan, appName, this.environment, categories, environmentFileContent, 
+                this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
         }
     }
 
@@ -468,6 +494,54 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                         if (trimmedUser.isEmpty()) {
                             return FormValidation.warning("Empty test user name found. Please remove empty entries or use comma-separated format: User1,User2");
                         }
+                    }
+                }
+                return FormValidation.ok();
+            }
+
+            public ListBoxModel doFillTestModeItems() {
+                ListBoxModel items = new ListBoxModel();
+                items.add("DataDriven", "DataDriven");
+                items.add("Traces", "Traces");
+                return items;
+            }
+
+            public ListBoxModel doFillRunOnItems() {
+                ListBoxModel items = new ListBoxModel();
+                items.add("Cloud", "cloud");
+                items.add("On-Premises", "on-premises");
+                return items;
+            }
+
+            @RequirePOST
+            public FormValidation doCheckTestMode(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok();
+                }
+                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Test mode is required when using app-based testing");
+                }
+                if (value != null && !value.trim().isEmpty()) {
+                    String normalized = value.trim();
+                    if (!"DataDriven".equalsIgnoreCase(normalized) && !"Traces".equalsIgnoreCase(normalized)) {
+                        return FormValidation.error("Test mode must be either 'DataDriven' or 'Traces'");
+                    }
+                }
+                return FormValidation.ok();
+            }
+
+            @RequirePOST
+            public FormValidation doCheckRunOn(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok();
+                }
+                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Run on is required when using app-based testing");
+                }
+                if (value != null && !value.trim().isEmpty()) {
+                    String normalized = value.trim().toLowerCase();
+                    if (!"cloud".equals(normalized) && !"on-premises".equals(normalized) && !"onprem".equals(normalized)) {
+                        return FormValidation.error("Run on must be either 'cloud' or 'on-premises'");
                     }
                 }
                 return FormValidation.ok();
