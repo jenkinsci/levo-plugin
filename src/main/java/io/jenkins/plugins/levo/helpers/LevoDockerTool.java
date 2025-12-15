@@ -227,12 +227,11 @@ public class LevoDockerTool {
             throw new IllegalArgumentException("One of --test-plan or --app-name must be provided");
         }
         
-        // Target URL is required unless using app-name (which can use default from app config)
-        if (target != null && !target.trim().isEmpty()) {
-            argb.add("--target-url", target);
-        } else if (appName == null || appName.trim().isEmpty()) {
-            throw new IllegalArgumentException("--target-url is required when using --test-plan");
+        // Target URL is required for all modes
+        if (target == null || target.trim().isEmpty()) {
+            throw new IllegalArgumentException("--target-url is required");
         }
+        argb.add("--target-url", target);
         
         if (generateJUnitReports != null && generateJUnitReports) {
             argb.add("--export-junit-xml=/home/levo/reports/junit.xml");
@@ -316,9 +315,11 @@ public class LevoDockerTool {
         if (testUsers != null && !testUsers.trim().isEmpty()) {
             argb.add("--test-users", testUsers);
         }
-        if (targetUrl != null && !targetUrl.trim().isEmpty()) {
-            argb.add("--target-url", targetUrl);
+        // Target URL is required
+        if (targetUrl == null || targetUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("--target-url is required for remote-test-run");
         }
+        argb.add("--target-url", targetUrl);
         
         // Failure criteria
         if (failSeverity != null && !failSeverity.trim().isEmpty() && !"none".equals(failSeverity)) {

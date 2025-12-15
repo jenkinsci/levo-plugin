@@ -69,7 +69,7 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     private String extraCLIArgs;
     
     // Execution mode selection
-    private String executionMode; // "testPlan" or "appName"
+    private String executionMode; // "testPlan", "appName", or "remoteTestRun"
     
     // New fields for app-based testing
     private String appName;
@@ -331,8 +331,8 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         // Determine execution mode - default to testPlan for backward compatibility
         String mode = executionMode != null && !executionMode.isEmpty() ? executionMode : "testPlan";
         
-        if ("appName".equals(mode)) {
-            // New approach: Use remote-test-run
+        if ("remoteTestRun".equals(mode)) {
+            // Mode 3: Remote Test Run - uses levo remote-test-run command
             LevoDockerTool.runLevoRemoteTestRun(
                 run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace),
                 appName, this.environment, categories, httpMethods, excludeMethods,
@@ -341,11 +341,15 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 failSeverity, failScope, failThreshold,
                 credentials.getAuthorizationKey(), credentials.getOrganizationId(), credentials.getBaseUrl()
             );
-        } else {
-            // Existing approach: Use test with test-plan or app-name
-            // Support both test-plan mode and app-name mode for levo test command
+        } else if ("appName".equals(mode)) {
+            // Mode 2: Application Name (Local run) - uses levo test --app-name command
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                target, testPlan, appName, this.environment, categories, environmentFileContent, 
+                target, null, appName, this.environment, categories, environmentFileContent, 
+                this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
+        } else {
+            // Mode 1: Test Plan LRN - uses levo test --test-plan command
+            LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
+                target, testPlan, null, null, null, environmentFileContent, 
                 this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
         }
     }
@@ -433,7 +437,7 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
                 }
-                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                if (("appName".equals(executionMode) || "remoteTestRun".equals(executionMode)) && (value == null || value.trim().isEmpty())) {
                     return FormValidation.error("Application name is required when using app-based testing");
                 }
                 return FormValidation.ok();
@@ -444,8 +448,30 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
                 }
-                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                if (("appName".equals(executionMode) || "remoteTestRun".equals(executionMode)) && (value == null || value.trim().isEmpty())) {
                     return FormValidation.error("Environment is required when using app-based testing");
+                }
+                return FormValidation.ok();
+            }
+
+            @RequirePOST
+            public FormValidation doCheckTarget(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
+                if (value == null || value.trim().isEmpty()) {
+                    return FormValidation.error("Target URL is required");
+                }
+                return FormValidation.ok();
+            }
+
+            @RequirePOST
+            public FormValidation doCheckTargetUrl(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+                if (item != null && !item.hasPermission(Item.CONFIGURE)) {
+                    return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
+                }
+                if ("remoteTestRun".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Target URL is required for remote test run");
                 }
                 return FormValidation.ok();
             }
