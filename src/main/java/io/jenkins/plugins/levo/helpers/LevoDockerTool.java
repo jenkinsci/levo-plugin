@@ -383,11 +383,14 @@ public class LevoDockerTool {
             if (exitCode != 0 && listener != null) {
                 listener.getLogger().println("Note: logout command exited with code " + exitCode + " (this is expected if no credentials exist)");
             }
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             // Don't fail if logout fails - it's just cleanup
             if (listener != null) {
                 listener.getLogger().println("Warning: Could not run levo logout: " + e.getMessage());
             }
+        } catch (RuntimeException e) {
+            // Re-throw runtime exceptions as they may indicate programming errors
+            throw e;
         }
     }
 
@@ -409,8 +412,13 @@ public class LevoDockerTool {
                     .envs(launchEnv)
                     .start()
                     .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, listener);
-        } catch (Exception e) {
-            // Ignore cleanup errors - logout may fail if no credentials exist
+        } catch (IOException | InterruptedException e) {
+            if (listener != null) {
+                listener.getLogger().println("Note: Could not run levo logout during cleanup: " + e.getMessage());
+            }
+        } catch (RuntimeException e) {
+            // Re-throw runtime exceptions as they may indicate programming errors
+            throw e;
         }
     }
 }
