@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
@@ -44,7 +45,6 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
-import hudson.Plugin;
 import hudson.model.AbstractProject;
 import hudson.model.Item;
 import hudson.model.Result;
@@ -61,20 +61,29 @@ import jenkins.tasks.SimpleBuildStep;
 
 public class TestPlanBuilder extends Builder implements SimpleBuildStep {
 
-    private String target;
+    /**
+     * Fields that may appear multiple times in the configuration UI are stored as
+     * lists. Jenkins/Stapler will bind an array of form values directly to a
+     * {@code List} or array but will not bind it to a scalar type. Keeping
+     * these fields as lists prevents WrongTypeException when duplicate form
+     * elements are submitted. The getter methods return the first non-empty
+     * element to maintain backwards compatibility with older versions of this
+     * plugin that treated these values as scalars.
+     */
+    private java.util.List<String> target;
     private String testPlan;
     private String levoCredentialsId;
-    private String secretEnvironmentId;
-    private Boolean generateJunitReport;
-    private String extraCLIArgs;
+    private java.util.List<String> secretEnvironmentId;
+    private java.util.List<Boolean> generateJunitReport;
+    private java.util.List<String> extraCLIArgs;
     
     // Execution mode selection
     private String executionMode; // "testPlan", "appName", or "remoteTestRun"
     
     // New fields for app-based testing
-    private String appName;
-    private String environment;
-    private String categories;
+    private java.util.List<String> appName;
+    private java.util.List<String> environment;
+    private java.util.List<String> categories;
     private String httpMethods;
     private String excludeMethods;
     private String endpointPattern;
@@ -98,10 +107,52 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     public TestPlanBuilder() {
         // Empty constructor - all fields set via @DataBoundSetter for flexibility
     }
+    
+    // Catch-all setter to ignore category checkboxes and other unknown fields
+    // Category checkboxes update the categories text field via JavaScript,
+    // so we don't need to process them on the server side
+    // Note: Multiple checkboxes with the same name are sent as an array,
+    // so we must accept List<Object> instead of Object
+    @DataBoundSetter
+    public void setCategoryCheckbox(List<Object> value) {
+        // Ignore - category checkboxes are handled by JavaScript
+    }
+    
+    // Ignore includeUser field if it exists in the form
+    // Note: Multiple checkboxes/inputs with the same name are sent as an array,
+    // so we must accept List<Object> instead of Object
+    @DataBoundSetter
+    public void setIncludeUser(List<Object> value) {
+        // Ignore - not used in this builder
+    }
 
+    // Setter that handles List<Object>, String[], and String to work with Stapler's array handling
+    @DataBoundSetter
+    public void setTarget(List<Object> target) {
+        if (target != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : target) {
+                if (item == null) continue;
+                String s = item.toString();
+                // Keep even empty strings so that we know a value was provided
+                values.add(s);
+            }
+            this.target = values;
+        } else {
+            this.target = null;
+        }
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setTarget(String target) {
-        this.target = target;
+        if (target != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(target);
+            this.target = values;
+        } else {
+            this.target = null;
+        }
     }
     
     @DataBoundSetter
@@ -114,19 +165,101 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         this.levoCredentialsId = levoCredentialsId;
     }
     
+    // Setter that handles List<Object> (for arrays) and Boolean to work with Stapler's array handling
+    @DataBoundSetter
+    public void setGenerateJunitReport(List<Object> generateJunitReport) {
+        if (generateJunitReport != null) {
+            java.util.List<Boolean> values = new java.util.ArrayList<>();
+            for (Object item : generateJunitReport) {
+                if (item == null) {
+                    values.add(null);
+                    continue;
+                }
+                if (item instanceof Boolean) {
+                    values.add((Boolean) item);
+                } else {
+                    // Try to parse as boolean
+                    String str = item.toString().toLowerCase();
+                    if ("true".equals(str) || "1".equals(str)) {
+                        values.add(Boolean.TRUE);
+                    } else if ("false".equals(str) || "0".equals(str) || str.isEmpty()) {
+                        values.add(Boolean.FALSE);
+                    } else {
+                        // Unknown value, treat as null
+                        values.add(null);
+                    }
+                }
+            }
+            this.generateJunitReport = values;
+        } else {
+            this.generateJunitReport = null;
+        }
+    }
+    
+    // Fallback for single Boolean values
     @DataBoundSetter
     public void setGenerateJunitReport(Boolean generateJunitReport) {
-        this.generateJunitReport = generateJunitReport;
+        if (generateJunitReport != null) {
+            java.util.List<Boolean> values = new java.util.ArrayList<>();
+            values.add(generateJunitReport);
+            this.generateJunitReport = values;
+        } else {
+            this.generateJunitReport = null;
+        }
     }
     
+    // Setter that handles List<Object> to work with Stapler's array handling
+    @DataBoundSetter
+    public void setExtraCLIArgs(List<Object> extraCLIArgs) {
+        if (extraCLIArgs != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : extraCLIArgs) {
+                if (item == null) continue;
+                values.add(item.toString());
+            }
+            this.extraCLIArgs = values;
+        } else {
+            this.extraCLIArgs = null;
+        }
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setExtraCLIArgs(String extraCLIArgs) {
-        this.extraCLIArgs = extraCLIArgs;
+        if (extraCLIArgs != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(extraCLIArgs);
+            this.extraCLIArgs = values;
+        } else {
+            this.extraCLIArgs = null;
+        }
     }
     
+    // Setter that handles List<Object> to work with Stapler's array handling
+    @DataBoundSetter
+    public void setSecretEnvironmentId(List<Object> secretEnvironmentId) {
+        if (secretEnvironmentId != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : secretEnvironmentId) {
+                if (item == null) continue;
+                values.add(item.toString());
+            }
+            this.secretEnvironmentId = values;
+        } else {
+            this.secretEnvironmentId = null;
+        }
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setSecretEnvironmentId(String secretEnvironmentId) {
-        this.secretEnvironmentId = secretEnvironmentId;
+        if (secretEnvironmentId != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(secretEnvironmentId);
+            this.secretEnvironmentId = values;
+        } else {
+            this.secretEnvironmentId = null;
+        }
     }
     
     @DataBoundSetter
@@ -134,19 +267,100 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         this.executionMode = executionMode;
     }
     
+    // Setter that handles List<Object>, String[], and String to work with Stapler's array handling
+    @DataBoundSetter
+    public void setAppName(List<Object> appName) {
+        if (appName != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : appName) {
+                if (item == null) continue;
+                values.add(item.toString());
+            }
+            this.appName = values;
+        } else {
+            this.appName = null;
+        }
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setAppName(String appName) {
-        this.appName = appName;
+        if (appName != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(appName);
+            this.appName = values;
+        } else {
+            this.appName = null;
+        }
     }
     
+    // Setter that handles List<Object>, String[], and String to work with Stapler's array handling
+    @DataBoundSetter
+    public void setEnvironment(List<Object> environment) {
+        if (environment != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : environment) {
+                if (item == null) continue;
+                values.add(item.toString());
+            }
+            this.environment = values;
+        } else {
+            this.environment = null;
+        }
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setEnvironment(String environment) {
-        this.environment = environment;
+        if (environment != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(environment);
+            this.environment = values;
+        } else {
+            this.environment = null;
+        }
     }
     
+    // Setter that handles List<Object> (for arrays), String[], and String to work with Stapler's array handling
+    // Accepts List<Object> as primary type so Stapler can bind arrays correctly
     @DataBoundSetter
+    public void setCategories(List<Object> categories) {
+        if (categories != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            for (Object item : categories) {
+                if (item == null) continue;
+                values.add(item.toString());
+            }
+            this.categories = values;
+        } else {
+            this.categories = null;
+        }
+    }
+    
+    // Fallback setter for single String values (Stapler may call this for non-array values)
+    @DataBoundSetter  
     public void setCategories(String categories) {
-        this.categories = categories;
+        if (categories != null) {
+            java.util.List<String> values = new java.util.ArrayList<>();
+            values.add(categories);
+            this.categories = values;
+        } else {
+            this.categories = null;
+        }
+    }
+    
+    // Setter that handles List<Object> to work with Stapler's array handling
+    @DataBoundSetter
+    public void setHttpMethods(List<Object> httpMethods) {
+        if (httpMethods != null) {
+            for (Object item : httpMethods) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.httpMethods = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.httpMethods = null;
     }
     
     @DataBoundSetter
@@ -155,8 +369,34 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     @DataBoundSetter
+    public void setExcludeMethods(List<Object> excludeMethods) {
+        if (excludeMethods != null) {
+            for (Object item : excludeMethods) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.excludeMethods = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.excludeMethods = null;
+    }
+    
+    @DataBoundSetter
     public void setExcludeMethods(String excludeMethods) {
         this.excludeMethods = excludeMethods;
+    }
+    
+    @DataBoundSetter
+    public void setEndpointPattern(List<Object> endpointPattern) {
+        if (endpointPattern != null) {
+            for (Object item : endpointPattern) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.endpointPattern = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.endpointPattern = null;
     }
     
     @DataBoundSetter
@@ -165,18 +405,74 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     @DataBoundSetter
+    public void setExcludeEndpointPattern(List<Object> excludeEndpointPattern) {
+        if (excludeEndpointPattern != null) {
+            for (Object item : excludeEndpointPattern) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.excludeEndpointPattern = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.excludeEndpointPattern = null;
+    }
+    
+    @DataBoundSetter
     public void setExcludeEndpointPattern(String excludeEndpointPattern) {
         this.excludeEndpointPattern = excludeEndpointPattern;
     }
     
+    // Setter that handles List<Object> to work with Stapler's array handling
+    @DataBoundSetter
+    public void setTestUsers(List<Object> testUsers) {
+        if (testUsers != null) {
+            for (Object item : testUsers) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.testUsers = item.toString().trim();
+                    return; // Use first non-empty value
+                }
+            }
+        }
+        this.testUsers = null;
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setTestUsers(String testUsers) {
         this.testUsers = testUsers;
     }
     
+    // Setter that handles List<Object> to work with Stapler's array handling
+    @DataBoundSetter
+    public void setTargetUrl(List<Object> targetUrl) {
+        if (targetUrl != null) {
+            for (Object item : targetUrl) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.targetUrl = item.toString().trim();
+                    return; // Use first non-empty value
+                }
+            }
+        }
+        this.targetUrl = null;
+    }
+    
+    // Fallback for single String values
     @DataBoundSetter
     public void setTargetUrl(String targetUrl) {
         this.targetUrl = targetUrl;
+    }
+    
+    @DataBoundSetter
+    public void setFailSeverity(List<Object> failSeverity) {
+        if (failSeverity != null) {
+            for (Object item : failSeverity) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.failSeverity = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.failSeverity = null;
     }
     
     @DataBoundSetter
@@ -185,8 +481,34 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     @DataBoundSetter
+    public void setFailScope(List<Object> failScope) {
+        if (failScope != null) {
+            for (Object item : failScope) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.failScope = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.failScope = null;
+    }
+    
+    @DataBoundSetter
     public void setFailScope(String failScope) {
         this.failScope = failScope;
+    }
+    
+    @DataBoundSetter
+    public void setFailThreshold(List<Object> failThreshold) {
+        if (failThreshold != null) {
+            for (Object item : failThreshold) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.failThreshold = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.failThreshold = null;
     }
     
     @DataBoundSetter
@@ -194,28 +516,86 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         this.failThreshold = failThreshold;
     }
 
+    /**
+     * Returns the first non-empty value from the {@code target} list. If the list
+     * is null or contains only empty entries, null is returned. This preserves
+     * backwards compatibility with earlier versions of this plugin that stored
+     * a single target as a scalar String.
+     */
     public String getTarget() {
-        return target;
+        if (target != null) {
+            for (String s : target) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
 
     public String getTestPlan() {
         return testPlan;
     }
 
+    /**
+     * Returns the first non-empty value from the {@code extraCLIArgs} list.
+     */
     public String getExtraCLIArgs() {
-        return extraCLIArgs;
+        if (extraCLIArgs != null) {
+            for (String s : extraCLIArgs) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
 
+    /**
+     * Returns the first non-empty value from the {@code secretEnvironmentId} list.
+     */
     public String getSecretEnvironmentId() {
-        return secretEnvironmentId;
+        if (secretEnvironmentId != null) {
+            for (String s : secretEnvironmentId) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
 
     public String getLevoCredentialsId() {
         return levoCredentialsId;
     }
 
+    /**
+     * Returns the first non-null value from the {@code generateJunitReport} list.
+     */
+    /**
+     * Returns the first non-null value from the {@code generateJunitReport} list.
+     *
+     * <p>
+     * Jenkins form submissions sometimes post duplicate values when multiple form sections
+     * define the same field. This method iterates over the collected values and returns
+     * the first non-null Boolean. If no value has been set (i.e. the list is
+     * {@code null} or contains only {@code null} entries), it returns {@code Boolean.FALSE}
+     * instead of {@code null}. Returning a default value avoids SpotBugs warnings
+     * (NP_BOOLEAN_RETURN_NULL) and makes the method safe for callers that expect a
+     * non-null result.
+     *
+     * @return the configured value if present, otherwise {@code Boolean.FALSE}
+     */
     public Boolean getGenerateJunitReport() {
-        return generateJunitReport;
+        if (generateJunitReport != null) {
+            for (Boolean b : generateJunitReport) {
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        // Default to false when no value has been specified
+        return Boolean.FALSE;
     }
     
     public String getExecutionMode() {
@@ -223,15 +603,36 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     public String getAppName() {
-        return appName;
+        if (appName != null) {
+            for (String s : appName) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
     
     public String getEnvironment() {
-        return environment;
+        if (environment != null) {
+            for (String s : environment) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
     
     public String getCategories() {
-        return categories;
+        if (categories != null) {
+            for (String s : categories) {
+                if (s != null && !s.trim().isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
     
     public String getHttpMethods() {
@@ -263,6 +664,19 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     @DataBoundSetter
+    public void setDataSource(List<Object> dataSource) {
+        if (dataSource != null) {
+            for (Object item : dataSource) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.dataSource = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.dataSource = null;
+    }
+    
+    @DataBoundSetter
     public void setDataSource(String dataSource) {
         this.dataSource = dataSource;
     }
@@ -272,12 +686,38 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     }
     
     @DataBoundSetter
+    public void setAppNameDataSource(List<Object> appNameDataSource) {
+        if (appNameDataSource != null) {
+            for (Object item : appNameDataSource) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.appNameDataSource = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.appNameDataSource = null;
+    }
+    
+    @DataBoundSetter
     public void setAppNameDataSource(String appNameDataSource) {
         this.appNameDataSource = appNameDataSource;
     }
     
     public String getRunOn() {
         return runOn;
+    }
+    
+    @DataBoundSetter
+    public void setRunOn(List<Object> runOn) {
+        if (runOn != null) {
+            for (Object item : runOn) {
+                if (item != null && !item.toString().trim().isEmpty()) {
+                    this.runOn = item.toString().trim();
+                    return;
+                }
+            }
+        }
+        this.runOn = null;
     }
     
     @DataBoundSetter
@@ -310,22 +750,24 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             return;
         }
         String environmentFileContent = null;
-        if (secretEnvironmentId != null && !secretEnvironmentId.trim().isEmpty()) {
+        // Resolve secret environment ID from list
+        String resolvedSecretEnvironmentId = getSecretEnvironmentId();
+        if (resolvedSecretEnvironmentId != null && !resolvedSecretEnvironmentId.trim().isEmpty()) {
             StringCredentials secretCredentials = CredentialsProvider.findCredentialById(
-                    secretEnvironmentId,
+                    resolvedSecretEnvironmentId,
                     StringCredentials.class,
                     run,
                     Lists.newArrayList()
             );
             if (secretCredentials == null) {
                 FileCredentials secretFileCredentials = CredentialsProvider.findCredentialById(
-                        secretEnvironmentId,
+                        resolvedSecretEnvironmentId,
                         FileCredentials.class,
                         run,
                         Lists.newArrayList()
                 );
                 if (secretFileCredentials == null) {
-                    listener.error("Defined Secret Environment not found: " + secretEnvironmentId);
+                    listener.error("Defined Secret Environment not found: " + resolvedSecretEnvironmentId);
                     run.setResult(Result.FAILURE);
                     return;
                 } else {
@@ -347,7 +789,7 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             // Mode 3: Remote Test Run - uses levo remote-test-run command
             LevoDockerTool.runLevoRemoteTestRun(
                 run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace),
-                appName, this.environment, categories, httpMethods, excludeMethods,
+                getAppName(), getEnvironment(), getCategories(), httpMethods, excludeMethods,
                 endpointPattern, excludeEndpointPattern, testUsers, targetUrl,
                 this.dataSource, this.runOn,
                 failSeverity, failScope, failThreshold,
@@ -355,14 +797,15 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             );
         } else if ("appName".equals(mode)) {
             // Mode 2: Application Name (Local run) - uses levo test --app-name command
+            // Note: testUsers is not passed since levo test --app-name doesn't support it yet
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                target, null, appName, this.environment, categories, this.appNameDataSource, environmentFileContent, 
-                this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
+                getTarget(), null, getAppName(), getEnvironment(), getCategories(), this.appNameDataSource, null, environmentFileContent, 
+                getGenerateJunitReport(), getExtraCLIArgs(), credentials.getOrganizationId(), credentials.getBaseUrl());
         } else {
             // Mode 1: Test Plan LRN - uses levo test --test-plan command
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                target, testPlan, null, null, null, null, environmentFileContent, 
-                this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
+                getTarget(), testPlan, null, null, null, null, null, environmentFileContent, 
+                getGenerateJunitReport(), getExtraCLIArgs(), credentials.getOrganizationId(), credentials.getBaseUrl());
         }
     }
 
@@ -385,15 +828,8 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
 
             @Override
             public boolean isApplicable(Class<? extends AbstractProject> jobType) {
-                Jenkins jenkins = Jenkins.getInstanceOrNull();
-                if (jenkins == null) {
-                    return false;
-                }
-                Plugin credentialsPlugin = jenkins.getPlugin("credentials");
-                if (credentialsPlugin == null) {
-                    return false;
-                }
-                return credentialsPlugin.getWrapper().isEnabled();
+                // Available for all project types
+                return true;
             }
 
             public ListBoxModel doFillLevoCredentialsIdItems(

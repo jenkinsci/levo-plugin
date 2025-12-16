@@ -126,7 +126,7 @@ public class LevoDockerTool {
         String apiBaseUrl = (baseUrl != null && !baseUrl.trim().isEmpty()) ? baseUrl : "https://api.levo.ai";
         argb.add("-e", "LEVO_BASE_URL=" + apiBaseUrl);
 
-        argb.add("levoai/levo:stable");
+        argb.add("levoai/levo:latest");
 
         return argb;
     }
@@ -142,7 +142,7 @@ public class LevoDockerTool {
         }
         ArgumentListBuilder argb = new ArgumentListBuilder();
         argb.add(DockerTool.getExecutable(null, currentNode, launcher.getListener(), launchEnv), "pull");
-        argb.add("levoai/levo:stable");
+        argb.add("levoai/levo:latest");
         runAndParseOutput(launcher, launchEnv, argb, PULL_TIMEOUT);
     }
 
@@ -196,7 +196,7 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String appName, @Nullable String env, @Nullable String categories, @Nullable String dataSource, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String appName, @Nullable String env, @Nullable String categories, @Nullable String dataSource, @Nullable String testUsers, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
 
@@ -223,6 +223,10 @@ public class LevoDockerTool {
             // Add data-source if provided (optional, default is "Test User Data")
             if (dataSource != null && !dataSource.trim().isEmpty()) {
                 argb.add("--data-source", dataSource);
+            }
+            // Add test-users if provided (only used with "Test User Data" data source)
+            if (testUsers != null && !testUsers.trim().isEmpty()) {
+                argb.add("--test-users", testUsers);
             }
         } else if (testPlan != null && !testPlan.trim().isEmpty()) {
             // Use existing test-plan mode
