@@ -196,7 +196,7 @@ public class LevoDockerTool {
         }
     }
 
-    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String appName, @Nullable String env, @Nullable String categories, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
+    public static void runLevoTestPlan(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir, String target, String testPlan, @Nullable String appName, @Nullable String env, @Nullable String categories, @Nullable String dataSource, @Nullable String environment, Boolean generateJUnitReports, String extraCLIArgs, @Nullable String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
         ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, buildEnv, workdir, baseUrl);
 
@@ -220,6 +220,10 @@ public class LevoDockerTool {
             if (categories != null && !categories.trim().isEmpty()) {
                 argb.add("--categories", categories);
             }
+            // Add data-source if provided (optional, default is "Test User Data")
+            if (dataSource != null && !dataSource.trim().isEmpty()) {
+                argb.add("--data-source", dataSource);
+            }
         } else if (testPlan != null && !testPlan.trim().isEmpty()) {
             // Use existing test-plan mode
             argb.add("--test-plan", testPlan);
@@ -227,11 +231,14 @@ public class LevoDockerTool {
             throw new IllegalArgumentException("One of --test-plan or --app-name must be provided");
         }
         
-        // Target URL is required for all modes
-        if (target == null || target.trim().isEmpty()) {
-            throw new IllegalArgumentException("--target-url is required");
+        // Target URL is optional when using --app-name (will use default from app config if available)
+        // But still required for --test-plan mode
+        if (target != null && !target.trim().isEmpty()) {
+            argb.add("--target-url", target);
+        } else if (testPlan != null && !testPlan.trim().isEmpty()) {
+            // Target URL is required for test-plan mode
+            throw new IllegalArgumentException("--target-url is required when using --test-plan");
         }
-        argb.add("--target-url", target);
         
         if (generateJUnitReports != null && generateJUnitReports) {
             argb.add("--export-junit-xml=/home/levo/reports/junit.xml");
@@ -262,7 +269,7 @@ public class LevoDockerTool {
     public static void runLevoRemoteTestRun(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, @Nullable EnvVars buildEnv, String workdir,
                                              String appName, String environment, String categories, String httpMethods, String excludeMethods,
                                              String endpointPattern, String excludeEndpointPattern, String testUsers, String targetUrl,
-                                             String testMode, String runOn,
+                                             String dataSource, String runOn,
                                              String failSeverity, String failScope, String failThreshold,
                                              Secret authorizationKey, String organizationId, @Nullable String baseUrl) throws IOException, InterruptedException {
         runDockerPull(run, launcher, launchEnv);
@@ -278,20 +285,22 @@ public class LevoDockerTool {
             argb.add("--env", environment);
         }
         
-        // Required: Test Mode
-        if (testMode == null || testMode.trim().isEmpty()) {
-            throw new IllegalArgumentException("--test-mode is required");
+        // Required: Data Source (user-facing: "Test User Data" or "Traces")
+        if (dataSource == null || dataSource.trim().isEmpty()) {
+            throw new IllegalArgumentException("--data-source is required");
         }
-        argb.add("--test-mode", testMode);
+        // Map user-facing values to CLI values (CLI accepts both user-facing and internal values)
+        // The CLI will handle the mapping internally, so we pass the user-facing value directly
+        argb.add("--data-source", dataSource.trim());
         
         // Required: Run On
         if (runOn == null || runOn.trim().isEmpty()) {
             throw new IllegalArgumentException("--run-on is required");
         }
-        // Normalize on-premises variations
-        String normalizedRunOn = runOn.trim();
+        // Normalize to on-prem (new standard value)
+        String normalizedRunOn = runOn.trim().toLowerCase();
         if ("onprem".equalsIgnoreCase(normalizedRunOn) || "on-premises".equalsIgnoreCase(normalizedRunOn)) {
-            normalizedRunOn = "on-premises";
+            normalizedRunOn = "on-prem";
         }
         argb.add("--run-on", normalizedRunOn);
         
@@ -311,7 +320,7 @@ public class LevoDockerTool {
         if (excludeEndpointPattern != null && !excludeEndpointPattern.trim().isEmpty()) {
             argb.add("--exclude-endpoint-pattern", excludeEndpointPattern);
         }
-        // Parse comma-separated test users and add --test-users flag (only used in DataDriven mode)
+        // Parse comma-separated test users and add --test-users flag (only used with "Test User Data" data source)
         if (testUsers != null && !testUsers.trim().isEmpty()) {
             argb.add("--test-users", testUsers);
         }

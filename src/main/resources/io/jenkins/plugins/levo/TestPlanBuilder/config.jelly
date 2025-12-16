@@ -68,6 +68,11 @@
                 <f:description>Environment name. Required when using Application Name.</f:description>
             </f:entry>
             
+            <f:entry title="${%Data Source}" field="appNameDataSource">
+                <f:select />
+                <f:description>Optional. Data source to use when creating test plans from app-name. Default: Test User Data. Test User Data requires test users. Traces uses traces for authentication.</f:description>
+            </f:entry>
+            
             <f:entry title="${%Categories}" field="categories">
                 <f:description>Select test categories to run. You can also manually edit the text field below to add custom categories.</f:description>
                 
@@ -162,7 +167,7 @@
             
             <f:entry title="${%Target}" field="target">
                 <f:textbox />
-                <f:description>Target URL to test. Required when using Application Name.</f:description>
+                <f:description>Target URL to test. Optional when using Application Name (will use default from app config if available).</f:description>
             </f:entry>
             
             <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
@@ -192,9 +197,9 @@
                 <f:description>Environment name. Required for remote test run.</f:description>
             </f:entry>
             
-            <f:entry title="${%Test Mode}" field="testMode">
+            <f:entry title="${%Data Source}" field="dataSource">
                 <f:select />
-                <f:description>Required. DataDriven requires test users. Traces uses traces for authentication.</f:description>
+                <f:description>Required. Test User Data requires test users. Traces uses traces for authentication.</f:description>
             </f:entry>
             
             <f:entry title="${%Run On}" field="runOn">
@@ -312,7 +317,7 @@
             
             <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
                 <f:textbox placeholder="e.g., Victim1,Victim2" />
-                <f:description>Test user name(s) to use. Only used in DataDriven mode. If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
+                <f:description>Test user name(s) to use. Only used with "Test User Data" data source. If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
             </f:entry>
             
             <f:entry title="${%Target URL}" field="targetUrl">

@@ -83,8 +83,11 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
     private String targetUrl;
     
     // New required fields for remote-test-run
-    private String testMode; // "DataDriven" or "Traces"
-    private String runOn;    // "cloud" or "on-premises"
+    private String dataSource; // "Test User Data" or "Traces" (user-facing)
+    private String runOn;    // "cloud" or "on-prem"
+    
+    // Data source for appName mode (local run)
+    private String appNameDataSource; // "Test User Data" or "Traces" (user-facing, optional, default: "Test User Data")
     
     // Failure criteria
     private String failSeverity; // "none", "low", "medium", "high", "critical"
@@ -255,13 +258,22 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         return targetUrl;
     }
     
-    public String getTestMode() {
-        return testMode;
+    public String getDataSource() {
+        return dataSource;
     }
     
     @DataBoundSetter
-    public void setTestMode(String testMode) {
-        this.testMode = testMode;
+    public void setDataSource(String dataSource) {
+        this.dataSource = dataSource;
+    }
+    
+    public String getAppNameDataSource() {
+        return appNameDataSource;
+    }
+    
+    @DataBoundSetter
+    public void setAppNameDataSource(String appNameDataSource) {
+        this.appNameDataSource = appNameDataSource;
     }
     
     public String getRunOn() {
@@ -337,19 +349,19 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace),
                 appName, this.environment, categories, httpMethods, excludeMethods,
                 endpointPattern, excludeEndpointPattern, testUsers, targetUrl,
-                this.testMode, this.runOn,
+                this.dataSource, this.runOn,
                 failSeverity, failScope, failThreshold,
                 credentials.getAuthorizationKey(), credentials.getOrganizationId(), credentials.getBaseUrl()
             );
         } else if ("appName".equals(mode)) {
             // Mode 2: Application Name (Local run) - uses levo test --app-name command
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                target, null, appName, this.environment, categories, environmentFileContent, 
+                target, null, appName, this.environment, categories, this.appNameDataSource, environmentFileContent, 
                 this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
         } else {
             // Mode 1: Test Plan LRN - uses levo test --test-plan command
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                target, testPlan, null, null, null, environmentFileContent, 
+                target, testPlan, null, null, null, null, environmentFileContent, 
                 this.generateJunitReport, this.extraCLIArgs, credentials.getOrganizationId(), credentials.getBaseUrl());
         }
     }
@@ -459,8 +471,9 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
                 }
-                if (value == null || value.trim().isEmpty()) {
-                    return FormValidation.error("Target URL is required");
+                // Target URL is required for testPlan mode, optional for appName mode (will use default from app config)
+                if (("testPlan".equals(executionMode) || executionMode == null || executionMode.isEmpty()) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Target URL is required when using Test Plan LRN");
                 }
                 return FormValidation.ok();
             }
@@ -525,9 +538,16 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 return FormValidation.ok();
             }
 
-            public ListBoxModel doFillTestModeItems() {
+            public ListBoxModel doFillDataSourceItems() {
                 ListBoxModel items = new ListBoxModel();
-                items.add("DataDriven", "DataDriven");
+                items.add("Test User Data", "Test User Data");
+                items.add("Traces", "Traces");
+                return items;
+            }
+            
+            public ListBoxModel doFillAppNameDataSourceItems() {
+                ListBoxModel items = new ListBoxModel();
+                items.add("Test User Data", "Test User Data");
                 items.add("Traces", "Traces");
                 return items;
             }
@@ -535,22 +555,22 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
             public ListBoxModel doFillRunOnItems() {
                 ListBoxModel items = new ListBoxModel();
                 items.add("Cloud", "cloud");
-                items.add("On-Premises", "on-premises");
+                items.add("On-Premises", "on-prem");
                 return items;
             }
 
             @RequirePOST
-            public FormValidation doCheckTestMode(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
+            public FormValidation doCheckDataSource(@AncestorInPath Item item, @QueryParameter String value, @QueryParameter String executionMode) {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok();
                 }
-                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
-                    return FormValidation.error("Test mode is required when using app-based testing");
+                if ("remoteTestRun".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Data source is required for remote test run");
                 }
                 if (value != null && !value.trim().isEmpty()) {
                     String normalized = value.trim();
-                    if (!"DataDriven".equalsIgnoreCase(normalized) && !"Traces".equalsIgnoreCase(normalized)) {
-                        return FormValidation.error("Test mode must be either 'DataDriven' or 'Traces'");
+                    if (!"Test User Data".equalsIgnoreCase(normalized) && !"Traces".equalsIgnoreCase(normalized)) {
+                        return FormValidation.error("Data source must be either 'Test User Data' or 'Traces'");
                     }
                 }
                 return FormValidation.ok();
@@ -561,13 +581,13 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok();
                 }
-                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
-                    return FormValidation.error("Run on is required when using app-based testing");
+                if ("remoteTestRun".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Run on is required for remote test run");
                 }
                 if (value != null && !value.trim().isEmpty()) {
                     String normalized = value.trim().toLowerCase();
-                    if (!"cloud".equals(normalized) && !"on-premises".equals(normalized) && !"onprem".equals(normalized)) {
-                        return FormValidation.error("Run on must be either 'cloud' or 'on-premises'");
+                    if (!"cloud".equals(normalized) && !"on-prem".equals(normalized)) {
+                        return FormValidation.error("Run on must be either 'cloud' or 'on-prem'");
                     }
                 }
                 return FormValidation.ok();
