@@ -155,7 +155,7 @@ public class LevoDockerTool {
         }
         
         // Clean up any existing credentials before login to ensure fresh authentication
-        cleanupCredentials(workdir, launcher.getListener());
+        cleanupCredentials(run, launcher, launchEnv, workdir, baseUrl, launcher.getListener());
         
         // Pull latest Docker image to ensure we're using the most recent version
         launcher.getListener().getLogger().println("Pulling latest Levo CLI image...");
@@ -188,10 +188,10 @@ public class LevoDockerTool {
         Launcher.ProcStarter procStarter = launcher.launch();
         try {
             procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
-            afterRunCleanUp(workdir);
+            afterRunCleanUp(run, launcher, launchEnv, workdir, null, launcher.getListener());
         } catch (InterruptedException e) {
             // Job aborted
-            afterRunCleanUp(workdir);
+            afterRunCleanUp(run, launcher, launchEnv, workdir, null, launcher.getListener());
             throw e;
         }
     }
@@ -262,7 +262,7 @@ public class LevoDockerTool {
             procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
         } finally {
             // Always clean up credentials after run
-            afterRunCleanUp(workdir);
+            afterRunCleanUp(run, launcher, launchEnv, workdir, baseUrl, launcher.getListener());
         }
     }
 
@@ -354,72 +354,63 @@ public class LevoDockerTool {
             procStarter.quiet(false).cmds(argb).envs(launchEnv).stdout(launcher.getListener().getLogger()).stderr(launcher.getListener().getLogger()).start().joinWithTimeout((long)CLIENT_TIMEOUT, TimeUnit.SECONDS, launcher.getListener());
         } finally {
             // Always clean up credentials after run
-            afterRunCleanUp(workdir);
+            afterRunCleanUp(run, launcher, launchEnv, workdir, baseUrl, launcher.getListener());
         }
     }
 
     /**
-     * Clean up credentials directory to ensure fresh authentication on each run
+     * Clean up credentials using levo logout command
      */
-    private static void cleanupCredentials(String workdir, TaskListener listener) throws IOException {
-        Path configPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
-        if (Files.exists(configPath)) {
-            try {
-                // Delete all files in the config directory
-                Files.walk(configPath)
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            // Log but don't fail if cleanup has issues
-                            if (listener != null) {
-                                listener.getLogger().println("Warning: Could not delete " + path + ": " + e.getMessage());
-                            }
-                        }
-                    });
-                if (listener != null) {
-                    listener.getLogger().println("Cleaned up existing credentials for fresh authentication.");
-                }
-            } catch (IOException e) {
-                // If walk fails, try simple delete
-                try {
-                    Files.delete(configPath);
-                } catch (IOException e2) {
-                    if (listener != null) {
-                        listener.getLogger().println("Warning: Could not clean up credentials directory: " + e2.getMessage());
-                    }
-                }
+    private static void cleanupCredentials(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, String workdir, @Nullable String baseUrl, TaskListener listener) throws IOException, InterruptedException {
+        try {
+            ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, null, workdir, baseUrl);
+            argb.add("logout");
+            
+            if (listener != null) {
+                listener.getLogger().println("Cleaning up credentials using levo logout...");
+            }
+            
+            Launcher.ProcStarter procStarter = launcher.launch();
+            int exitCode = procStarter.quiet(false)
+                    .cmds(argb)
+                    .envs(launchEnv)
+                    .stdout(listener != null ? listener.getLogger() : System.out)
+                    .stderr(listener != null ? listener.getLogger() : System.err)
+                    .start()
+                    .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, listener);
+            
+            // Logout command may fail if there's no existing config, which is fine
+            if (exitCode != 0 && listener != null) {
+                listener.getLogger().println("Note: logout command exited with code " + exitCode + " (this is expected if no credentials exist)");
+            }
+        } catch (Exception e) {
+            // Don't fail if logout fails - it's just cleanup
+            if (listener != null) {
+                listener.getLogger().println("Warning: Could not run levo logout: " + e.getMessage());
             }
         }
     }
 
-    private static void afterRunCleanUp(String workdir) throws IOException {
+    private static void afterRunCleanUp(@NonNull Run run, @NonNull Launcher launcher, @NonNull EnvVars launchEnv, String workdir, @Nullable String baseUrl, TaskListener listener) throws IOException, InterruptedException {
+        // Clean up environment file
         Path envPath = Paths.get(workdir, ENV_FILE_NAME);
-        Path configPath = Paths.get(workdir, LEVO_CONFIG_FOLDER_NAME);
         if (Files.exists(envPath)) {
             Files.delete(envPath);
         }
-        // Clean up credentials after run
-        if (Files.exists(configPath)) {
-            try {
-                Files.walk(configPath)
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            // Ignore cleanup errors
-                        }
-                    });
-            } catch (IOException e) {
-                // If walk fails, try simple delete
-                try {
-                    Files.delete(configPath);
-                } catch (IOException e2) {
-                    // Ignore cleanup errors
-                }
-            }
+        
+        // Clean up credentials using levo logout command
+        try {
+            ArgumentListBuilder argb = buildLevoCommand(run, launcher, launchEnv, null, workdir, baseUrl);
+            argb.add("logout");
+            
+            Launcher.ProcStarter procStarter = launcher.launch();
+            procStarter.quiet(true)
+                    .cmds(argb)
+                    .envs(launchEnv)
+                    .start()
+                    .joinWithTimeout(CMD_TIMEOUT, TimeUnit.SECONDS, listener);
+        } catch (Exception e) {
+            // Ignore cleanup errors - logout may fail if no credentials exist
         }
     }
 }
