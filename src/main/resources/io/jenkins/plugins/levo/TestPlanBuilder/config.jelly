@@ -24,23 +24,772 @@
         xmlns:f="/lib/form"
         xmlns:c="/lib/credentials"
 >
-    <f:entry title="${%Test Plan}" field="testPlan">
-        <f:textbox />
-    </f:entry>
-    <f:entry title="${%Target}" field="target">
-        <f:textbox />
-    </f:entry>
-    <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
-        <f:textbox />
-    </f:entry>
-    <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
-        <f:checkbox />
-    </f:entry>
     <f:entry field="levoCredentialsId" title="${%Levo Credential}">
         <c:select/>
     </f:entry>
-    <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
-        <c:select/>
+    
+    <f:entry title="${%Execution Mode}" field="executionMode">
+        <f:radio name="executionMode" value="appName" checked="${instance.executionMode=='appName' || instance.executionMode==null}" title="Application Name" />
+        <f:radio name="executionMode" value="testPlan" checked="${instance.executionMode=='testPlan'}" title="Test Plan LRN" />
+        <f:radio name="executionMode" value="remoteTestRun" checked="${instance.executionMode=='remoteTestRun'}" title="Remote Test Run" />
     </f:entry>
-</j:jelly>
+    
+    <!-- Mode 1: Test Plan LRN Configuration Section -->
+    <div id="testPlanConfig">
+        <f:entry title="${%Test Plan LRN}" field="testPlan">
+            <f:textbox />
+            <f:description>Test plan LRN identifier for local execution.</f:description>
+        </f:entry>
+        <f:entry title="${%Target}" field="target">
+            <f:textbox />
+            <f:description>Target URL to test. Required.</f:description>
+        </f:entry>
+        <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
+            <f:textbox />
+        </f:entry>
+        <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
+            <f:checkbox />
+        </f:entry>
+        <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
+            <c:select/>
+        </f:entry>
+    </div>
+    
+    <!-- Mode 2: Application Name (Local Run) Configuration Section -->
+    <div id="appNameConfig">
+        <f:section title="Application Name Configuration">
+            <f:entry title="${%Application Name}" field="appName">
+                <f:textbox />
+                <f:description>Application name to test. Will create a test plan dynamically and run it locally.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Environment}" field="environment">
+                <f:textbox />
+                <f:description>Environment name. Required when using Application Name.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Data Source}" field="appNameDataSource">
+                <f:select />
+                <f:description>Optional. Data source to use when creating test plans from app-name. Default: Test User Data. Test User Data requires test users. Traces uses traces for authentication.</f:description>
+            </f:entry>
+            
+            <!-- Test Users field hidden for Application Name mode (not supported yet) -->
+            <div id="appNameTestUsers" style="display: none;">
+                <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
+                    <f:textbox placeholder="e.g., Victim1,Victim2" />
+                    <f:description>Test user name(s) to use. Only used with "Test User Data" data source. If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
+                </f:entry>
+            </div>
+            
+            <f:entry title="${%Categories}" field="categories">
+                <f:description>Select test categories to run. You can also manually edit the text field below to add custom categories.</f:description>
+                
+                <div style="margin-top: 15px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <a href="javascript:void(0)" onclick="selectAllCategories()" style="color: #0066cc; margin-right: 10px; text-decoration: none;">Select all</a>
+                            <a href="javascript:void(0)" onclick="clearAllCategories()" style="color: #333; text-decoration: none;">Clear all</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBROKEN_USER_AUTH" name="categoryCheckbox" value="BROKEN_USER_AUTH" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken User Authentication
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCORS" name="categoryCheckbox" value="CORS" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            CORS
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catFUZZING" name="categoryCheckbox" value="FUZZING" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Fuzzing
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catMASS_ASSIGNMENT" name="categoryCheckbox" value="MASS_ASSIGNMENT" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Mass Assignment
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catNOSQL_INJECTION" name="categoryCheckbox" value="NOSQL_INJECTION" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            NoSQL Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCOMMAND_INJECTION" name="categoryCheckbox" value="COMMAND_INJECTION" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Command Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catRATE_LIMIT" name="categoryCheckbox" value="RATE_LIMIT" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Rate Limit
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catREMOTE_CODE_EXECUTION" name="categoryCheckbox" value="REMOTE_CODE_EXECUTION" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Remote Code Execution
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSQL_INJECTION" name="categoryCheckbox" value="SQL_INJECTION" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            SQL Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBOLA" name="categoryCheckbox" value="BOLA" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken Object Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBFLA" name="categoryCheckbox" value="BFLA" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Broken Function Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDEFAULT_REQUEST_CHECKS" name="categoryCheckbox" value="DEFAULT_REQUEST_CHECKS" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Default Request Checks
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSSRF" name="categoryCheckbox" value="SSRF" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Server Side Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catADVANCED_BOLA" name="categoryCheckbox" value="ADVANCED_BOLA" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Advanced BOLA
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSCHEMA_CONFORMANCE" name="categoryCheckbox" value="SCHEMA_CONFORMANCE" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Schema Conformance
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catGRAPHQL_INFO_LEAK" name="categoryCheckbox" value="GRAPHQL_INFO_LEAK" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Graphql Info Leak
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCSRF" name="categoryCheckbox" value="CSRF" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Cross-Site Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDENIAL_OF_SERVICE" name="categoryCheckbox" value="DENIAL_OF_SERVICE" class="category-checkbox" onchange="updateCategoriesField()" style="margin-right: 8px;" />
+                            Denial of Service
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="categoriesTextFieldContainer">
+                    <f:textbox field="categories" default="BOLA,BFLA,INJECTION,SSRF" />
+                    <f:description>Categories as comma-separated values. Checkboxes above will update this field, or you can edit manually to add custom categories.</f:description>
+                </div>
+            </f:entry>
+            
+            <f:entry title="${%Target}" field="target">
+                <f:textbox />
+                <f:description>Target URL to test. Required.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Generate JUnit Reports}" field="generateJunitReport">
+                <f:checkbox />
+            </f:entry>
+            
+            <f:entry title="${%Environment Secret Text}" field="secretEnvironmentId">
+                <c:select/>
+            </f:entry>
+        </f:section>
+    </div>
+    
+    <!-- Mode 3: Remote Test Run Configuration Section -->
+    <div id="remoteTestRunConfig">
+        <f:section title="${%Remote Test Run Configuration}">
+            <f:entry title="${%Application Name}" field="appName">
+                <f:textbox />
+                <f:description>Application name to test. Tests will run remotely on Levo Cloud or On-Premises.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Environment}" field="environment">
+                <f:textbox />
+                <f:description>Environment name. Required for remote test run.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Data Source}" field="dataSource">
+                <f:select />
+                <f:description>Required. Test User Data requires test users. Traces uses traces for authentication.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Run On}" field="runOn">
+                <f:select />
+                <f:description>Required. Where to execute the test run - Cloud or On-Premises.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Categories}" field="categories">
+                <f:description>Select test categories to run. You can also manually edit the text field below to add custom categories.</f:description>
+                
+                <div style="margin-top: 15px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <a href="javascript:void(0)" onclick="selectAllCategoriesRT()" style="color: #0066cc; margin-right: 10px; text-decoration: none;">Select all</a>
+                            <a href="javascript:void(0)" onclick="clearAllCategoriesRT()" style="color: #333; text-decoration: none;">Clear all</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBROKEN_USER_AUTH_RT" name="categoryCheckboxRT" value="BROKEN_USER_AUTH" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Broken User Authentication
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCORS_RT" name="categoryCheckboxRT" value="CORS" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            CORS
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catFUZZING_RT" name="categoryCheckboxRT" value="FUZZING" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Fuzzing
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catMASS_ASSIGNMENT_RT" name="categoryCheckboxRT" value="MASS_ASSIGNMENT" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Mass Assignment
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catNOSQL_INJECTION_RT" name="categoryCheckboxRT" value="NOSQL_INJECTION" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            NoSQL Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCOMMAND_INJECTION_RT" name="categoryCheckboxRT" value="COMMAND_INJECTION" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Command Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catRATE_LIMIT_RT" name="categoryCheckboxRT" value="RATE_LIMIT" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Rate Limit
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catREMOTE_CODE_EXECUTION_RT" name="categoryCheckboxRT" value="REMOTE_CODE_EXECUTION" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Remote Code Execution
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSQL_INJECTION_RT" name="categoryCheckboxRT" value="SQL_INJECTION" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            SQL Injection
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBOLA_RT" name="categoryCheckboxRT" value="BOLA" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Broken Object Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catBFLA_RT" name="categoryCheckboxRT" value="BFLA" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Broken Function Level Authorization
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDEFAULT_REQUEST_CHECKS_RT" name="categoryCheckboxRT" value="DEFAULT_REQUEST_CHECKS" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Default Request Checks
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSSRF_RT" name="categoryCheckboxRT" value="SSRF" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Server Side Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catADVANCED_BOLA_RT" name="categoryCheckboxRT" value="ADVANCED_BOLA" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Advanced BOLA
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catSCHEMA_CONFORMANCE_RT" name="categoryCheckboxRT" value="SCHEMA_CONFORMANCE" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Schema Conformance
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catGRAPHQL_INFO_LEAK_RT" name="categoryCheckboxRT" value="GRAPHQL_INFO_LEAK" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Graphql Info Leak
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catCSRF_RT" name="categoryCheckboxRT" value="CSRF" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Cross-Site Request Forgery
+                        </label>
+                        <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                            <input type="checkbox" id="catDENIAL_OF_SERVICE_RT" name="categoryCheckboxRT" value="DENIAL_OF_SERVICE" class="category-checkbox-rt" onchange="updateCategoriesFieldRT()" style="margin-right: 8px;" />
+                            Denial of Service
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="categoriesTextFieldContainerRT">
+                    <f:textbox field="categories" default="BOLA,BFLA,INJECTION,SSRF" />
+                    <f:description>Categories as comma-separated values. Checkboxes above will update this field, or you can edit manually to add custom categories.</f:description>
+                </div>
+            </f:entry>
+            
+            <f:entry title="${%HTTP Methods (optional)}" field="httpMethods">
+                <f:textbox placeholder="e.g., GET,POST,PUT" />
+            </f:entry>
+            
+            <f:entry title="${%Exclude Methods (optional)}" field="excludeMethods">
+                <f:textbox placeholder="e.g., DELETE,OPTIONS" />
+            </f:entry>
+            
+            <f:entry title="${%Endpoint Pattern (regex, optional)}" field="endpointPattern">
+                <f:textbox placeholder="e.g., .*api.*" />
+            </f:entry>
+            
+            <f:entry title="${%Exclude Endpoint Pattern (regex, optional)}" field="excludeEndpointPattern">
+                <f:textbox />
+            </f:entry>
+            
+            <f:entry title="${%Test Users (comma-separated, optional)}" field="testUsers">
+                <f:textbox placeholder="e.g., Victim1,Victim2" />
+                <f:description>Test user name(s) to use. Only used with "Test User Data" data source. If not specified, uses default user. Test users must be configured in Levo SaaS first.</f:description>
+            </f:entry>
+            
+            <f:entry title="${%Target URL}" field="targetUrl">
+                <f:textbox />
+                <f:description>Target URL to test. Required for remote test run.</f:description>
+            </f:entry>
+            
+            <f:advanced>
+                <f:entry title="${%Fail Severity}" field="failSeverity">
+                    <f:select />
+                </f:entry>
+                
+                <f:entry title="${%Fail Scope}" field="failScope">
+                    <f:select />
+                </f:entry>
+                
+                <f:entry title="${%Fail Threshold (optional)}" field="failThreshold">
+                    <f:textbox />
+                </f:entry>
+            </f:advanced>
+        </f:section>
+    </div>
+    
+    <script>
+        <![CDATA[
+        // Prevent form submission issues with disabled/hidden fields
+        function sanitizeFormBeforeSubmit(e) {
+            var form = e ? e.target : document.querySelector('form[method="post"]');
+            if (!form) {
+                form = document.querySelector('form');
+            }
+            if (form) {
+                var disabledInputs = form.querySelectorAll('input[disabled], select[disabled], textarea[disabled]');
+                var removedElements = [];
+                for (var i = 0; i < disabledInputs.length; i++) {
+                    var elem = disabledInputs[i];
+                    var name = elem.getAttribute('name') || '';
+                    if (name.indexOf('executionMode') === -1 && name !== 'executionMode') {
+                        var parent = elem.parentNode;
+                        var nextSibling = elem.nextSibling;
+                        removedElements.push({element: elem, parent: parent, nextSibling: nextSibling});
+                        elem.remove();
+                    }
+                }
+                setTimeout(function() {
+                    for (var j = 0; j < removedElements.length; j++) {
+                        var item = removedElements[j];
+                        if (item.parent && item.element) {
+                            if (item.nextSibling) {
+                                item.parent.insertBefore(item.element, item.nextSibling);
+                            } else {
+                                item.parent.appendChild(item.element);
+                            }
+                        }
+                    }
+                }, 100);
+            }
+        }
+        
+        // Attach form submit handler
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                var form = document.querySelector('form');
+                if (form) {
+                    form.addEventListener('submit', sanitizeFormBeforeSubmit, true);
+                }
+            });
+        } else {
+            var form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', sanitizeFormBeforeSubmit, true);
+            }
+        }
+        
+        /**
+         * Enable or disable all interactive fields within a section.
+         */
+        function toggleSectionFields(section, disabled) {
+            if (!section) return;
+            var inputs = section.querySelectorAll('input, select, textarea');
+            inputs.forEach(function(el) {
+                if (el.type === 'radio' && (el.name.indexOf('executionMode') !== -1 || el.name === 'executionMode')) {
+                    el.disabled = false;
+                } else {
+                    el.disabled = disabled;
+                }
+            });
+        }
 
+        function updateExecutionMode() {
+            var testPlanConfig = document.getElementById('testPlanConfig');
+            var appNameConfig = document.getElementById('appNameConfig');
+            var remoteTestRunConfig = document.getElementById('remoteTestRunConfig');
+            var appNameTestUsers = document.getElementById('appNameTestUsers');
+
+            if (!testPlanConfig || !appNameConfig || !remoteTestRunConfig) {
+                return;
+            }
+
+            // Find the checked radio button
+            var radios = document.querySelectorAll('input[type="radio"]');
+            var selectedValue = null;
+
+            for (var i = 0; i < radios.length; i++) {
+                var name = radios[i].getAttribute('name') || '';
+                var value = radios[i].value || '';
+                if ((name.indexOf('executionMode') !== -1 || name === 'executionMode') &&
+                    (value === 'testPlan' || value === 'appName' || value === 'remoteTestRun') &&
+                    radios[i].checked) {
+                    selectedValue = value;
+                    break;
+                }
+            }
+
+            // Hide all config sections and disable their inputs
+            testPlanConfig.style.display = 'none';
+            appNameConfig.style.display = 'none';
+            remoteTestRunConfig.style.display = 'none';
+            toggleSectionFields(testPlanConfig, true);
+            toggleSectionFields(appNameConfig, true);
+            toggleSectionFields(remoteTestRunConfig, true);
+            
+            // Hide test users field in Application Name mode (not supported yet)
+            if (appNameTestUsers) {
+                appNameTestUsers.style.display = 'none';
+            }
+
+            // Show the appropriate section based on selected mode and enable its inputs
+            if (selectedValue === 'appName') {
+                appNameConfig.style.display = 'block';
+                toggleSectionFields(appNameConfig, false);
+                // Keep test users hidden
+                if (appNameTestUsers) {
+                    appNameTestUsers.style.display = 'none';
+                }
+            } else if (selectedValue === 'remoteTestRun') {
+                remoteTestRunConfig.style.display = 'block';
+                toggleSectionFields(remoteTestRunConfig, false);
+            } else if (selectedValue === 'testPlan') {
+                testPlanConfig.style.display = 'block';
+                toggleSectionFields(testPlanConfig, false);
+            } else {
+                // Default to appName mode if nothing selected
+                appNameConfig.style.display = 'block';
+                toggleSectionFields(appNameConfig, false);
+                if (appNameTestUsers) {
+                    appNameTestUsers.style.display = 'none';
+                }
+            }
+        }
+        
+        // Use event delegation for dynamic forms
+        function attachListeners() {
+            var form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('change', function(e) {
+                    if (e.target && e.target.type === 'radio' && 
+                        (e.target.value === 'testPlan' || e.target.value === 'appName' || e.target.value === 'remoteTestRun')) {
+                        updateExecutionMode();
+                    }
+                });
+            }
+            
+            // Also attach directly to radios if they exist
+            var radios = document.querySelectorAll('input[type="radio"]');
+            for (var i = 0; i < radios.length; i++) {
+                var value = radios[i].value || '';
+                if (value === 'testPlan' || value === 'appName' || value === 'remoteTestRun') {
+                    radios[i].addEventListener('change', updateExecutionMode);
+                }
+            }
+        }
+        
+        // Initialize on page load
+        function init() {
+            updateExecutionMode();
+            attachListeners();
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(init, 100);
+            });
+        } else {
+            setTimeout(init, 100);
+        }
+        
+        // Also run after a delay to catch dynamically loaded content
+        setTimeout(init, 500);
+        
+        // Category checkbox functions
+        function updateCategoriesField() {
+            var categories = [];
+            var allCheckboxes = document.querySelectorAll('.category-checkbox:checked');
+            
+            for (var i = 0; i < allCheckboxes.length; i++) {
+                if (allCheckboxes[i].value) {
+                    categories.push(allCheckboxes[i].value);
+                }
+            }
+            
+            var categoriesField = findCategoriesField();
+            if (categoriesField) {
+                var existingValue = categoriesField.value || '';
+                var existingCategories = existingValue.split(',').map(function(c) { return c.trim(); });
+                var knownCategories = [
+                    'BOLA', 'BFLA', 'SSRF', 'CORS', 'BROKEN_USER_AUTH', 'FUZZING', 'MASS_ASSIGNMENT',
+                    'NOSQL_INJECTION', 'COMMAND_INJECTION', 'RATE_LIMIT', 'REMOTE_CODE_EXECUTION',
+                    'SQL_INJECTION', 'INJECTION', 'DEFAULT_REQUEST_CHECKS', 'ADVANCED_BOLA', 'SCHEMA_CONFORMANCE',
+                    'GRAPHQL_INFO_LEAK', 'CSRF', 'DENIAL_OF_SERVICE', 'AUTH', 'XSS', 'IDOR'
+                ];
+                
+                var customCategories = existingCategories.filter(function(cat) {
+                    return cat && knownCategories.indexOf(cat.toUpperCase()) === -1;
+                });
+                
+                var allCategories = categories.concat(customCategories);
+                categoriesField.value = allCategories.join(',');
+            }
+        }
+        
+        function selectAllCategories() {
+            var checkboxes = document.querySelectorAll('.category-checkbox');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = true;
+            }
+            updateCategoriesField();
+        }
+        
+        function clearAllCategories() {
+            var checkboxes = document.querySelectorAll('.category-checkbox');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = false;
+            }
+            updateCategoriesField();
+        }
+        
+        function findCategoriesField() {
+            var container = document.getElementById('categoriesTextFieldContainer');
+            if (container) {
+                var field = container.querySelector('input[type="text"]');
+                if (field) {
+                    return field;
+                }
+            }
+            var appNameConfig = document.getElementById('appNameConfig');
+            if (appNameConfig) {
+                var allInputs = appNameConfig.querySelectorAll('input[type="text"]');
+                for (var j = 0; j < allInputs.length; j++) {
+                    var field = allInputs[j];
+                    var name = field.getAttribute('name') || '';
+                    if (name.indexOf('categories') !== -1) {
+                        return field;
+                    }
+                }
+            }
+            var allFields = document.querySelectorAll('input[type="text"]');
+            for (var i = 0; i < allFields.length; i++) {
+                var name = allFields[i].getAttribute('name') || '';
+                if (name.indexOf('categories') !== -1) {
+                    return allFields[i];
+                }
+            }
+            return null;
+        }
+        
+        function updateCategoriesCheckboxes() {
+            var categoriesField = findCategoriesField();
+            if (!categoriesField) return;
+            
+            var value = categoriesField.value || '';
+            var categories = value.split(',').map(function(c) { return c.trim().toUpperCase(); });
+            
+            var checkboxMap = {
+                'BOLA': 'catBOLA',
+                'BFLA': 'catBFLA',
+                'SSRF': 'catSSRF',
+                'CORS': 'catCORS',
+                'BROKEN_USER_AUTH': 'catBROKEN_USER_AUTH',
+                'FUZZING': 'catFUZZING',
+                'MASS_ASSIGNMENT': 'catMASS_ASSIGNMENT',
+                'NOSQL_INJECTION': 'catNOSQL_INJECTION',
+                'COMMAND_INJECTION': 'catCOMMAND_INJECTION',
+                'RATE_LIMIT': 'catRATE_LIMIT',
+                'REMOTE_CODE_EXECUTION': 'catREMOTE_CODE_EXECUTION',
+                'SQL_INJECTION': 'catSQL_INJECTION',
+                'DEFAULT_REQUEST_CHECKS': 'catDEFAULT_REQUEST_CHECKS',
+                'ADVANCED_BOLA': 'catADVANCED_BOLA',
+                'SCHEMA_CONFORMANCE': 'catSCHEMA_CONFORMANCE',
+                'GRAPHQL_INFO_LEAK': 'catGRAPHQL_INFO_LEAK',
+                'CSRF': 'catCSRF',
+                'DENIAL_OF_SERVICE': 'catDENIAL_OF_SERVICE',
+                'INJECTION': 'catSQL_INJECTION',
+                'AUTH': 'catBROKEN_USER_AUTH',
+                'XSS': 'catCSRF',
+                'IDOR': 'catBOLA'
+            };
+            
+            var allCheckboxes = document.querySelectorAll('input[type="checkbox"][id^="cat"]');
+            for (var j = 0; j < allCheckboxes.length; j++) {
+                allCheckboxes[j].checked = false;
+            }
+            
+            for (var i = 0; i < categories.length; i++) {
+                var cat = categories[i];
+                if (checkboxMap[cat]) {
+                    var checkbox = document.getElementById(checkboxMap[cat]);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        }
+        
+        function initCategories() {
+            setTimeout(function() {
+                updateCategoriesCheckboxes();
+                var categoriesField = findCategoriesField();
+                if (categoriesField) {
+                    categoriesField.addEventListener('change', updateCategoriesCheckboxes);
+                    categoriesField.addEventListener('input', updateCategoriesCheckboxes);
+                }
+            }, 200);
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCategories);
+        } else {
+            initCategories();
+        }
+        
+        // Remote Test Run category functions
+        function updateCategoriesFieldRT() {
+            var categories = [];
+            var allCheckboxes = document.querySelectorAll('.category-checkbox-rt:checked');
+            
+            for (var i = 0; i < allCheckboxes.length; i++) {
+                if (allCheckboxes[i].value) {
+                    categories.push(allCheckboxes[i].value);
+                }
+            }
+            
+            var categoriesField = findCategoriesFieldRT();
+            if (categoriesField) {
+                var existingValue = categoriesField.value || '';
+                var existingCategories = existingValue.split(',').map(function(c) { return c.trim(); });
+                var knownCategories = [
+                    'BOLA', 'BFLA', 'SSRF', 'CORS', 'BROKEN_USER_AUTH', 'FUZZING', 'MASS_ASSIGNMENT',
+                    'NOSQL_INJECTION', 'COMMAND_INJECTION', 'RATE_LIMIT', 'REMOTE_CODE_EXECUTION',
+                    'SQL_INJECTION', 'INJECTION', 'DEFAULT_REQUEST_CHECKS', 'ADVANCED_BOLA', 'SCHEMA_CONFORMANCE',
+                    'GRAPHQL_INFO_LEAK', 'CSRF', 'DENIAL_OF_SERVICE', 'AUTH', 'XSS', 'IDOR'
+                ];
+                
+                var customCategories = existingCategories.filter(function(cat) {
+                    return cat && knownCategories.indexOf(cat.toUpperCase()) === -1;
+                });
+                
+                var allCategories = categories.concat(customCategories);
+                categoriesField.value = allCategories.join(',');
+            }
+        }
+        
+        function selectAllCategoriesRT() {
+            var checkboxes = document.querySelectorAll('.category-checkbox-rt');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = true;
+            }
+            updateCategoriesFieldRT();
+        }
+        
+        function clearAllCategoriesRT() {
+            var checkboxes = document.querySelectorAll('.category-checkbox-rt');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = false;
+            }
+            updateCategoriesFieldRT();
+        }
+        
+        function findCategoriesFieldRT() {
+            var container = document.getElementById('categoriesTextFieldContainerRT');
+            if (container) {
+                var field = container.querySelector('input[type="text"]');
+                if (field) {
+                    return field;
+                }
+            }
+            var remoteTestRunConfig = document.getElementById('remoteTestRunConfig');
+            if (remoteTestRunConfig) {
+                var allInputs = remoteTestRunConfig.querySelectorAll('input[type="text"]');
+                for (var j = 0; j < allInputs.length; j++) {
+                    var field = allInputs[j];
+                    var name = field.getAttribute('name') || '';
+                    if (name.indexOf('categories') !== -1) {
+                        return field;
+                    }
+                }
+            }
+            return null;
+        }
+        
+        function updateCategoriesCheckboxesRT() {
+            var categoriesField = findCategoriesFieldRT();
+            if (!categoriesField) return;
+            
+            var value = categoriesField.value || '';
+            var categories = value.split(',').map(function(c) { return c.trim().toUpperCase(); });
+            
+            var checkboxMap = {
+                'BOLA': 'catBOLA_RT',
+                'BFLA': 'catBFLA_RT',
+                'SSRF': 'catSSRF_RT',
+                'CORS': 'catCORS_RT',
+                'BROKEN_USER_AUTH': 'catBROKEN_USER_AUTH_RT',
+                'FUZZING': 'catFUZZING_RT',
+                'MASS_ASSIGNMENT': 'catMASS_ASSIGNMENT_RT',
+                'NOSQL_INJECTION': 'catNOSQL_INJECTION_RT',
+                'COMMAND_INJECTION': 'catCOMMAND_INJECTION_RT',
+                'RATE_LIMIT': 'catRATE_LIMIT_RT',
+                'REMOTE_CODE_EXECUTION': 'catREMOTE_CODE_EXECUTION_RT',
+                'SQL_INJECTION': 'catSQL_INJECTION_RT',
+                'DEFAULT_REQUEST_CHECKS': 'catDEFAULT_REQUEST_CHECKS_RT',
+                'ADVANCED_BOLA': 'catADVANCED_BOLA_RT',
+                'SCHEMA_CONFORMANCE': 'catSCHEMA_CONFORMANCE_RT',
+                'GRAPHQL_INFO_LEAK': 'catGRAPHQL_INFO_LEAK_RT',
+                'CSRF': 'catCSRF_RT',
+                'DENIAL_OF_SERVICE': 'catDENIAL_OF_SERVICE_RT',
+                'INJECTION': 'catSQL_INJECTION_RT',
+                'AUTH': 'catBROKEN_USER_AUTH_RT',
+                'XSS': 'catCSRF_RT',
+                'IDOR': 'catBOLA_RT'
+            };
+            
+            var allCheckboxes = document.querySelectorAll('input[type="checkbox"][id$="_RT"]');
+            for (var j = 0; j < allCheckboxes.length; j++) {
+                allCheckboxes[j].checked = false;
+            }
+            
+            for (var i = 0; i < categories.length; i++) {
+                var cat = categories[i];
+                if (checkboxMap[cat]) {
+                    var checkbox = document.getElementById(checkboxMap[cat]);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        }
+        
+        function initCategoriesRT() {
+            setTimeout(function() {
+                updateCategoriesCheckboxesRT();
+                var categoriesField = findCategoriesFieldRT();
+                if (categoriesField) {
+                    categoriesField.addEventListener('change', updateCategoriesCheckboxesRT);
+                    categoriesField.addEventListener('input', updateCategoriesCheckboxesRT);
+                }
+            }, 200);
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCategoriesRT);
+        } else {
+            initCategoriesRT();
+        }
+        ]]>
+    </script>
+</j:jelly>

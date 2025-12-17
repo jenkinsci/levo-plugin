@@ -16,6 +16,7 @@
 
 package io.jenkins.plugins.levo.credentials;
 
+import com.cloudbees.plugins.credentials.CredentialsDescriptor;
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.impl.BaseStandardCredentials;
 import hudson.Extension;
@@ -26,12 +27,15 @@ public class LevoCLICredentialsImpl extends BaseStandardCredentials implements L
 
     private final String organizationId;
     private final Secret authorizationKey;
+    private final String baseUrl;
 
     @DataBoundConstructor
-    public LevoCLICredentialsImpl(CredentialsScope scope, String id, String description, String organizationId, Secret authorizationKey) {
+    public LevoCLICredentialsImpl(CredentialsScope scope, String id, String description, String organizationId, Secret authorizationKey, String baseUrl) {
         super(scope, id, description);
         this.organizationId = organizationId;
         this.authorizationKey = authorizationKey;
+        // Default to production environment if not provided
+        this.baseUrl = (baseUrl != null && !baseUrl.trim().isEmpty()) ? baseUrl : "https://api.levo.ai";
     }
 
     @Override
@@ -44,11 +48,16 @@ public class LevoCLICredentialsImpl extends BaseStandardCredentials implements L
         return this.authorizationKey;
     }
 
+    @Override
+    public String getBaseUrl() {
+        return this.baseUrl;
+    }
+
     @Extension
-    public static class DescriptorImpl extends BaseStandardCredentialsDescriptor {
+    public static class DescriptorImpl extends CredentialsDescriptor {
         @Override
         public String getDisplayName() {
-            return "Levo CLI Credentials"; // (10)
+            return "Levo CLI Credentials";
         }
     }
 }
