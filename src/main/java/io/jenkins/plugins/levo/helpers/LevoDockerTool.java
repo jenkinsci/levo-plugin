@@ -126,7 +126,7 @@ public class LevoDockerTool {
         String apiBaseUrl = (baseUrl != null && !baseUrl.trim().isEmpty()) ? baseUrl : "https://api.levo.ai";
         argb.add("-e", "LEVO_BASE_URL=" + apiBaseUrl);
 
-        argb.add("levoai/levo:latest");
+        argb.add("levoai/levo:stable");
 
         return argb;
     }
@@ -142,7 +142,7 @@ public class LevoDockerTool {
         }
         ArgumentListBuilder argb = new ArgumentListBuilder();
         argb.add(DockerTool.getExecutable(null, currentNode, launcher.getListener(), launchEnv), "pull");
-        argb.add("levoai/levo:latest");
+        argb.add("levoai/levo:stable");
         runAndParseOutput(launcher, launchEnv, argb, PULL_TIMEOUT);
     }
 

@@ -29,8 +29,8 @@
     </f:entry>
     
     <f:entry title="${%Execution Mode}" field="executionMode">
-        <f:radio name="executionMode" value="testPlan" checked="${instance.executionMode=='testPlan' || instance.executionMode==null}" title="Test Plan LRN" />
-        <f:radio name="executionMode" value="appName" checked="${instance.executionMode=='appName'}" title="Application Name" />
+        <f:radio name="executionMode" value="appName" checked="${instance.executionMode=='appName' || instance.executionMode==null}" title="Application Name" />
+        <f:radio name="executionMode" value="testPlan" checked="${instance.executionMode=='testPlan'}" title="Test Plan LRN" />
         <f:radio name="executionMode" value="remoteTestRun" checked="${instance.executionMode=='remoteTestRun'}" title="Remote Test Run" />
     </f:entry>
     
@@ -464,10 +464,16 @@
             } else if (selectedValue === 'remoteTestRun') {
                 remoteTestRunConfig.style.display = 'block';
                 toggleSectionFields(remoteTestRunConfig, false);
-            } else {
-                // Default to test plan mode if nothing selected
+            } else if (selectedValue === 'testPlan') {
                 testPlanConfig.style.display = 'block';
                 toggleSectionFields(testPlanConfig, false);
+            } else {
+                // Default to appName mode if nothing selected
+                appNameConfig.style.display = 'block';
+                toggleSectionFields(appNameConfig, false);
+                if (appNameTestUsers) {
+                    appNameTestUsers.style.display = 'none';
+                }
             }
         }
         

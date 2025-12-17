@@ -782,8 +782,8 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         // Login is required for authentication
         LevoDockerTool.runLevoLogin(run, launcher, env, getPath(launcher, workspace), credentials.getAuthorizationKey(), credentials.getOrganizationId(), credentials.getBaseUrl());
         
-        // Determine execution mode - default to testPlan for backward compatibility
-        String mode = executionMode != null && !executionMode.isEmpty() ? executionMode : "testPlan";
+        // Determine execution mode - default to appName
+        String mode = executionMode != null && !executionMode.isEmpty() ? executionMode : "appName";
         
         if ("remoteTestRun".equals(mode)) {
             // Mode 3: Remote Test Run - uses levo remote-test-run command
