@@ -798,8 +798,13 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
         } else if ("appName".equals(mode)) {
             // Mode 2: Application Name (Local run) - uses levo test --app-name command
             // Note: testUsers is not passed since levo test --app-name doesn't support it yet
+            // Validate that target URL is provided
+            String target = getTarget();
+            if (target == null || target.trim().isEmpty()) {
+                throw new IllegalArgumentException("Target URL is required when using Application Name mode");
+            }
             LevoDockerTool.runLevoTestPlan(run, launcher, env, run.getEnvironment(listener), getPath(launcher, workspace), 
-                getTarget(), null, getAppName(), getEnvironment(), getCategories(), this.appNameDataSource, null, environmentFileContent, 
+                target, null, getAppName(), getEnvironment(), getCategories(), this.appNameDataSource, null, environmentFileContent, 
                 getGenerateJunitReport(), getExtraCLIArgs(), credentials.getOrganizationId(), credentials.getBaseUrl());
         } else {
             // Mode 1: Test Plan LRN - uses levo test --test-plan command
@@ -907,9 +912,12 @@ public class TestPlanBuilder extends Builder implements SimpleBuildStep {
                 if (item != null && !item.hasPermission(Item.CONFIGURE)) {
                     return FormValidation.ok(); // Return OK if no permission to avoid exposing validation logic
                 }
-                // Target URL is required for testPlan mode, optional for appName mode (will use default from app config)
+                // Target URL is required for testPlan and appName modes
                 if (("testPlan".equals(executionMode) || executionMode == null || executionMode.isEmpty()) && (value == null || value.trim().isEmpty())) {
                     return FormValidation.error("Target URL is required when using Test Plan LRN");
+                }
+                if ("appName".equals(executionMode) && (value == null || value.trim().isEmpty())) {
+                    return FormValidation.error("Target URL is required when using Application Name");
                 }
                 return FormValidation.ok();
             }

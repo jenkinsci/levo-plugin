@@ -175,7 +175,7 @@
             
             <f:entry title="${%Target}" field="target">
                 <f:textbox />
-                <f:description>Target URL to test. Optional when using Application Name (will use default from app config if available).</f:description>
+                <f:description>Target URL to test. Required.</f:description>
             </f:entry>
             
             <f:entry title="${%Extra CLI Arguments}" field="extraCLIArgs">
